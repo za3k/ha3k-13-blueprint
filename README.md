@@ -1,7 +1,8 @@
 Hack-A-Blueprint is a tool to 
 
 Feature list:
- [ ] Add a canvas area with drawn polygons
+ [x] Add a canvas area with drawn polygons
+ [ ] Add grid effect
  [ ] Add a toolbar with a rectangle draw tool
  [ ] Add save/restore and autosave
  [ ] Add polygon merging

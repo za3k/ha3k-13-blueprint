@@ -1,8 +1,77 @@
-footer {
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+div.draw-area {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 6rem;
+}
+div.draw-area canvas {
+    display: block;
+    border: thin dashed red;
+    position: absolute;
+    bottom: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+}
+
+.toolbar {
+    position: fixed;
+    bottom: 3rem;
+    left: 0;
+    right: 0;
+    padding: 4px;
+    height: 3rem;
+    background: white;
+    border-top: 2px dashed lightgrey;
+}
+
+.toolbar > *, .tools > *, .settings > *, .toggle > * {
+    display: inline-block;
+}
+
+.tool {
+    cursor: pointer;
+}
+.tool.selected {
+    border: 1px solid red;
+}
+
+.settings {
+    border-left: 2px dashed lightgrey;
+    padding-left: 1rem;
+    margin-left: 1rem;
+}
+.toggle > * {
+    padding: .2rem 1em .2em 1em;
+}
+.toggle-title {
+    font-weight: bold;
+}
+.toggle-option {
+    cursor: pointer;
+    color: grey;
+}
+.toggle-option:hover {
+    color: black;
+}
+.toggle-option.selected {
+    background: lightgrey;
+    color: black;
+}
+
+.footer {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     padding: 4px;
+    height: 3rem;
     background: white;
+    border-top: 2px dashed lightgrey;
 }
