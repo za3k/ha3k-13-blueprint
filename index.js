@@ -103,10 +103,11 @@ class Blueprint {
         // Coordinate: Array of two floats
         this.polygons = []; // A multi-polygon
         this.drawErase = false;
-        this.icons = [];
+        this.objects = [];
         this.gridSnap = true;
         this.gridSize = 20;
         this.snapSize = 10;
+        this.selectedIcon = null;
         this.title = "";
         this.zoom = 1.0;
         this.history = [];
@@ -121,26 +122,32 @@ class Blueprint {
             icon: new IconTool(this),
             text: new TextTool(this),
         };
+        const ROTATION = {
+            name: ["North", "East", "West", "South", "North, Flipped", "East, Flipped", "West, Flipped", "South, Flipped"],
+            transform: ["", "rotate(90deg)", "rotate(180deg)", "rotate(270deg)", "scaleX(-1)", "scaleX(-1),rotate(90deg)", "scaleX(-1),rotate(180deg)", "scaleX(-1),rotate(270deg)"],
+        }
+        const ROT2 = [0,1];
+        const ROT4 = [0,1,2,3];
+        const ROT8 = [0,4,1,5,2,6,3,7];
         const ICONS = [
-            {name:"Window", image:"image/window.jpg", rotations: 4},
-            {name:"Door", image:"image/door.jpg", rotations: 4},
-            {name:"Outlet", image:"image/outlet.jpg", rotations: 4},
-            {name:"HVAC", image:"image/square.jpg", text: "HVAC"},
-            {name:"Fridge", image:"image/square.jpg", text: "Fridge"},
-            {name:"Stove", image:"image/square.jpg", text: "Stove"},
-            {name:"Water Heater", image:"image/square.jpg", text: "Water Heater"},
-            {name:"Sump Pump", image:"image/square.jpg", text: "Sump"},
+            {name:"Window", image:"image/icon-window.png", rotations: ROT4},
+            {name:"Door", image:"image/icon-door.png", rotations: ROT8},
+            {name:"Outlet", image:"image/icon-outlet.png", rotations: ROT2},
+            {name:"HVAC", image:"image/icon-square.png", text: "HVAC"},
+            {name:"Fridge", image:"image/icon-square.png", text: "Fridge"},
+            {name:"Stove", image:"image/icon-square.png", text: "Stove"},
+            {name:"Water Heater", image:"image/icon-square.png", text: "Water Heater"},
+            {name:"Sump Pump", image:"image/icon-square.png", text: "Sump"},
         ];
         this.ICONS = {};
         for (var icon of ICONS) {
             if (icon.rotations) {
-                for (var r = 0; r<icon.rotations; r++) {
+                for (var r of icon.rotations) {
                     const copy = deepcopy(icon);
                     delete copy.rotations;
                     copy.rotation = r;
                     copy.id = `${icon.name} : ${r}`;
-                    const ROTATION = ["North", "East", "West", "South"];
-                    copy.name = `${icon.name} (${ROTATION[r]})`;
+                    //copy.name = `${icon.name} (${ROTATION.name[r]})`;
                     this.ICONS[copy.id] = copy;
                 }
             } else {
@@ -150,7 +157,9 @@ class Blueprint {
         }
 
         for (var [id, icon] of Object.entries(this.ICONS)) {
-            const iconSelector = $(`<div class="icon action" data-function="selectIcon" data-value="${icon.id}"><img src="${icon.image}" alt="${icon.text}"/><span class="icon-name">${icon.name}</span></div>`);
+            const [width, height] = icon.size || [32, 32];
+            const iconSelector = $(`<div class="icon action" data-function="selectIcon" data-value="${icon.id}"><img src="${icon.image}" alt="${icon.text}" width=${width} height=${height}/><span class="icon-name">${icon.name}</span></div>`);
+            iconSelector.find("img").css("transform", ROTATION.transform[icon.rotation]);
             $(".icons").append(iconSelector);
         }
     }
@@ -248,6 +257,13 @@ class Blueprint {
             x: Math.round(point.x/this.snapSize)*this.snapSize,
             y: Math.round(point.y/this.snapSize)*this.snapSize,
         }
+    }
+    selectIcon(options) {
+        const icon = options.value;
+        $(".icon.selected").removeClass("selected");
+        $(`.icon[data-value="${icon}"]`).addClass("selected");
+        this.selectedIcon = icon;
+        //this.currentTool.selectIcon(icon);
     }
     selectTool(options) {
         const tool = options.tool
@@ -353,9 +369,10 @@ $(document).ready((ev) => {
 
     // Hook up click actions
     $(".action").on("click", (ev) => {
-        const dispatch = $(ev.target).data("function");
-        const options = $(ev.target).data();
+        const dispatch = $(ev.currentTarget).data("function");
+        const options = $(ev.currentTarget).data();
         bp[dispatch].bind(bp)(options);
     });
+    $("img").attr("draggable", "false");
 
 });

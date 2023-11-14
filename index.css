@@ -33,6 +33,28 @@ div.draw-area canvas {
 .icons {
     min-width: 5rem;
     min-height: 5rem;
+    max-height: 10rem;
+}
+.icon {
+    display: inline-block;
+    font-size: 10pt;
+    padding: 0.2rem;
+}
+.icons > h3 {
+    margin: 0 2rem 0 0;
+    display: inline-block;
+}
+.icon > img {
+    display: block;
+    margin: auto;
+}
+.icon.selected {
+    border: 1px dashed darkorange;
+    background: black;
+    color: white;
+}
+.icon.selected > img {
+    filter: invert(1);
 }
 
 .fonts {
@@ -58,8 +80,9 @@ div.draw-area canvas {
 .tool {
     cursor: pointer;
 }
-.tool.incomplete {
+.toolbar .incomplete {
     text-decoration: line-through;
+    visibility: hidden;
 }
 .tool.selected {
     border: 1px solid red;
