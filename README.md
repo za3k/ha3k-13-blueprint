@@ -30,3 +30,5 @@ Feature list:
 Credits:
 - Heavy inspiration (but no graphics or code) came from the D&D map editor, <a href="https://ww.dungeonscrawl.com">dungeon scrawl</a>.
 - Icons by [Creaticca Creative Agency - Flaticon]("https://www.flaticon.com/free-icons/save") as part of the "Graphic design tools" icon pack.
+- Fonts
+    - [Permanent Marker](https://fonts.google.com/specimen/Permanent+Marker) by Font Diner. Apache license.

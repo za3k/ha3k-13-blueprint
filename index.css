@@ -19,6 +19,27 @@ div.draw-area canvas {
     right: 0;
 }
 
+.icons, .font {
+    position: fixed;
+    display: none;
+    bottom: 6rem;
+    right: 0;
+    padding: 1rem;
+    background: white;
+    border: 2px dashed lightgrey;
+    border-bottom: 0;
+}
+
+.icons {
+    min-width: 5rem;
+    min-height: 5rem;
+}
+
+.fonts {
+    width: 5rem;
+    height: 5rem;
+}
+
 .toolbar {
     position: fixed;
     bottom: 3rem;
@@ -36,6 +57,9 @@ div.draw-area canvas {
 
 .tool {
     cursor: pointer;
+}
+.tool.incomplete {
+    text-decoration: line-through;
 }
 .tool.selected {
     border: 1px solid red;
@@ -73,4 +97,15 @@ div.draw-area canvas {
     height: 3rem;
     background: white;
     border-top: 2px dashed lightgrey;
+}
+
+.text {
+    font-family: PermanentMarker;
+}
+
+@font-face {
+    font-family: PermanentMarker;
+    font-style: normal;
+    font-weight: 400;
+    src: url("font/PermanentMarker-Regular.ttf");
 }

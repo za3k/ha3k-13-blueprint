@@ -1,9 +1,24 @@
 function deepcopy(x) { return JSON.parse(JSON.stringify(x)); }
 
 class Tool {
-    constructor(bp) {
-        this.partialAction = { draw: false }; // A tool may have started being used, and is incomplete
+    emptyAction = { };
+    constructor(bp, ...args) {
+        this.partialAction = deepcopy(this.emptyAction); // A tool may have started being used, and is incomplete
         this.bp = bp;
+    }
+    forgetState() { this.partialAction = deepcopy(this.emptyAction); }
+    onMouseMove(canvasPoint) { this.partialAction.mousePosition = canvasPoint; }
+    onMouseDown(canvasPoint) { this.partialAction.mousePosition = canvasPoint; }
+    onMouseUp(canvasPoint) { this.partialAction.mousePosition = canvasPoint; }
+    renderPreview(ctx) { } // Render a preview for mouse hover, partial draw, etc.
+}
+
+// Single-click, multiple clicks, drag motion
+
+class RectangleTool extends Tool {
+    emptyAction = { draw: false };
+    constructor(...args) {
+        super(...args);
     }
     forgetState() {
         this.partialAction = { draw: false };
@@ -69,14 +84,11 @@ class Tool {
         }
     }
 }
-
-// Single-click, multiple clicks, drag motion
-
+class IconTool extends Tool {
+}
 class PanTool extends Tool { }
 class SelectTool extends Tool { }
-class RectangleTool extends Tool { }
 class PolygonTool extends Tool { }
-class IconTool extends Tool { }
 class TextTool extends Tool { }
 
 class Blueprint {
@@ -84,14 +96,12 @@ class Blueprint {
         this.persisted = ["polygons", "icons", "title", "autosave"];
         // NOT persisted: viewport position and zoom, tool state, undo/redo history
         this.origin = [0,0];
+
         // A "MultiPolygon": Array of polygons
-        // A "Polygon": Array of rings
+        // A "Polygon": Array of rings (first exterior, others "holes")
         // Ring: Array of coordinates (first and last the same)
-        // Coordinate: Array of two floatsCoordinate: Array of two floats
-        this.polygons = [
-            [[[5,5], [100,5], [100, 50], [15, 50], [5, 5],]],      // One quadralateral
-            [[[105,5], [200,5], [200, 50], [115, 50], [105, 5],]], // One quadralateral
-        ];
+        // Coordinate: Array of two floats
+        this.polygons = []; // A multi-polygon
         this.drawErase = false;
         this.icons = [];
         this.gridSnap = true;
@@ -111,6 +121,38 @@ class Blueprint {
             icon: new IconTool(this),
             text: new TextTool(this),
         };
+        const ICONS = [
+            {name:"Window", image:"image/window.jpg", rotations: 4},
+            {name:"Door", image:"image/door.jpg", rotations: 4},
+            {name:"Outlet", image:"image/outlet.jpg", rotations: 4},
+            {name:"HVAC", image:"image/square.jpg", text: "HVAC"},
+            {name:"Fridge", image:"image/square.jpg", text: "Fridge"},
+            {name:"Stove", image:"image/square.jpg", text: "Stove"},
+            {name:"Water Heater", image:"image/square.jpg", text: "Water Heater"},
+            {name:"Sump Pump", image:"image/square.jpg", text: "Sump"},
+        ];
+        this.ICONS = {};
+        for (var icon of ICONS) {
+            if (icon.rotations) {
+                for (var r = 0; r<icon.rotations; r++) {
+                    const copy = deepcopy(icon);
+                    delete copy.rotations;
+                    copy.rotation = r;
+                    copy.id = `${icon.name} : ${r}`;
+                    const ROTATION = ["North", "East", "West", "South"];
+                    copy.name = `${icon.name} (${ROTATION[r]})`;
+                    this.ICONS[copy.id] = copy;
+                }
+            } else {
+                icon.id = icon.name;
+                this.ICONS[icon.id] = icon;
+            }
+        }
+
+        for (var [id, icon] of Object.entries(this.ICONS)) {
+            const iconSelector = $(`<div class="icon action" data-function="selectIcon" data-value="${icon.id}"><img src="${icon.image}" alt="${icon.text}"/><span class="icon-name">${icon.name}</span></div>`);
+            $(".icons").append(iconSelector);
+        }
     }
     get canvas() {
         return $(".draw-area > canvas")[0];
@@ -212,6 +254,7 @@ class Blueprint {
         console.log(`Tool ${tool} selected`);
         $(".tool.selected").removeClass("selected");
         $(`.tool[data-tool=${tool}]`).addClass("selected");
+        $(".icons").toggle(tool === "icon");
 
         if (!this.TOOLS[options.tool]) {
             console.log(`tool ${tool} not implemented`);
