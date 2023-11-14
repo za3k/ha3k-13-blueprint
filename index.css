@@ -19,7 +19,7 @@ div.draw-area canvas {
     right: 0;
 }
 
-.icons, .font {
+.icons, .fonts {
     position: fixed;
     display: none;
     bottom: 6rem;
