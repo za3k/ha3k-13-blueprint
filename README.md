@@ -2,7 +2,7 @@ Hack-A-Blueprint is a tool to draw house floorplans and blueprints.
 
 A demo can be [seen here](https://za3k.github.io/ha3k-13-blueprint/).
 
-[![Screenshot](screenshot.jpg)](https://za3k.github.io/ha3k-13-blueprint/)
+[![Screenshot](screenshot.png)](https://za3k.github.io/ha3k-13-blueprint/)
 
 It was made in one day by za3k as part of [hack-a-day](https://za3k.com/hackaday).
 
