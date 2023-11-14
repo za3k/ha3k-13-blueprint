@@ -1,3 +1,5 @@
+function deepcopy(x) { return JSON.parse(JSON.stringify(x)); }
+
 class Tool {
     constructor(bp) {
         this.partialAction = { draw: false }; // A tool may have started being used, and is incomplete
@@ -18,9 +20,15 @@ class Tool {
         const [l, r] = [Math.min(start.x, stop.x), Math.max(start.x, stop.x)];
         const [t, b] = [Math.min(start.y, stop.y), Math.max(start.y, stop.y)];
         const rect = [[l, t], [r, t], [r, b], [l, b], [l, t]];
-        this.bp.doAction(() => {
-            this.bp.polygons.push(rect);
-        });
+        if (this.bp.drawErase) {
+            this.bp.doAction(() => {
+                this.bp.erasePoly([rect]);
+            });
+        } else {
+            this.bp.doAction(() => {
+                this.bp.addPoly([rect]);
+            });
+        }
         this.forgetState();
         this.partialAction.mousePosition = canvasPoint;
     }
@@ -41,15 +49,15 @@ class Tool {
             ctx.lineTo( stop.x, start.y);
             ctx.closePath();
             ctx.fill();
-            //ctx.stroke();
+            ctx.stroke();
         } else {
             // Show a little preview rectangle
             const side = bp.snapSize;
             const tl = this.partialAction.mousePosition;
 
             ctx.fillStyle = "rgba(0, 0, 255, 0.5)";
-            ctx.strokeStyle = "#00f";
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#66f";
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(tl.x, tl.y);
             ctx.lineTo(tl.x + side, tl.y);
@@ -57,7 +65,7 @@ class Tool {
             ctx.lineTo(tl.x, tl.y+side);
             ctx.closePath();
             ctx.fill();
-            //ctx.stroke();
+            ctx.stroke();
         }
     }
 }
@@ -71,17 +79,19 @@ class PolygonTool extends Tool { }
 class IconTool extends Tool { }
 class TextTool extends Tool { }
 
-
 class Blueprint {
     constructor() {
         this.persisted = ["polygons", "icons", "title", "autosave"];
         // NOT persisted: viewport position and zoom, tool state, undo/redo history
         this.origin = [0,0];
-        this.polygons = [ // Polygons go clockwise
-            [[5,5], [100,5], [100, 50], [15, 50], [5, 5],],      // One quadralateral
-            [[105,5], [200,5], [200, 50], [115, 50], [105, 5],], // One quadralateral
+        // A "MultiPolygon": Array of polygons
+        // A "Polygon": Array of rings
+        // Ring: Array of coordinates (first and last the same)
+        // Coordinate: Array of two floatsCoordinate: Array of two floats
+        this.polygons = [
+            [[[5,5], [100,5], [100, 50], [15, 50], [5, 5],]],      // One quadralateral
+            [[[105,5], [200,5], [200, 50], [115, 50], [105, 5],]], // One quadralateral
         ];
-        this.holes = []; // Holes are polygons draw counter-clockwise.
         this.drawErase = false;
         this.icons = [];
         this.gridSnap = true;
@@ -118,14 +128,23 @@ class Blueprint {
         }
     }
     save() {
-        localStorage.setItem("blueprint", this.state);
+        localStorage.setItem("blueprint", JSON.stringify(this.state));
     }
     restore() {
         if (localStorage.getItem("blueprint"))
-          this.state = localStorage.getItem("blueprint");
+          this.state = JSON.parse(localStorage.getItem("blueprint"));
+        this.redraw();
+    }
+    addPoly(poly) {
+        this.polygons = polygonClipping.union(this.polygons, poly);
+    }
+    erasePoly(poly) {
+        this.polygons = polygonClipping.difference(this.polygons, poly);
     }
     redraw() {
         const canvas = this.canvas;
+        canvas.height = window.innerHeight;
+        canvas.width = window.innerWidth;
         var ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -133,6 +152,7 @@ class Blueprint {
         for (var i = -this.gridSize; i < canvas.width + this.gridSize; i+= this.gridSize) {
             for (var j = -this.gridSize; j < canvas.height + this.gridSize; j+= this.gridSize) {
                 ctx.fillStyle = "#000";
+                ctx.strokeWidth = 1;
                 ctx.beginPath();
                 const radius = 0.5 / this.zoom;
                 ctx.arc(i, j, radius, 0, 2 * Math.PI);
@@ -141,17 +161,21 @@ class Blueprint {
         }
 
         // Draw polygons
-        // TODO: Add holes counter-clockwise
-        ctx.fillStyle = "#f00";
+        ctx.fillStyle = "brown";
+        ctx.strokeStyle = "black";
+        ctx.strokeWidth = 5;
         ctx.beginPath();
         for (var poly of this.polygons) {
-            ctx.moveTo(poly[0][0], poly[0][1]);
-            for (var point of poly.slice(1)) {
-                ctx.lineTo(point[0], point[1]);
+            for (var ring of poly) {
+                ctx.moveTo(ring[0][0], ring[0][1]);
+                for (var point of ring.slice(1)) {
+                    ctx.lineTo(point[0], point[1]);
+                }
+                ctx.closePath();
             }
-            ctx.closePath();
         }
         ctx.fill()
+        ctx.stroke()
 
         if (this.currentTool) {
             this.currentTool.renderPreview(ctx);
@@ -159,24 +183,29 @@ class Blueprint {
     }
     doAction(a) {
         // TODO: Add action name to the history
-        this.history.push(this.state);
+        this.history.push(deepcopy(this.state));
         a();
         this.redoHistory = [];
         this.redraw();
         if (this.autosave) this.save();
     }
     undo() {
+        if (this.history.length == 0) return;
         this.redoHistory.push(this.state);
         this.state = this.history.pop();
         this.redraw();
     }
     redo() {
+        if (this.redoHistory.length == 0) return;
         this.history.push(this.state);
-        this.sate = this.redoHistory.pop();
+        this.state = this.redoHistory.pop();
         this.redraw();
     }
     snap(point) {
-        return point;
+        return {
+            x: Math.round(point.x/this.snapSize)*this.snapSize,
+            y: Math.round(point.y/this.snapSize)*this.snapSize,
+        }
     }
     selectTool(options) {
         const tool = options.tool
@@ -194,15 +223,26 @@ class Blueprint {
             this.currentTool = this.TOOLS[options.tool];
             this.currentTool.forgetState(); // SHOULD not be needed but just in case.
         }
-        // TODO: Add a click handler
     }
-    shareLink()         { console.log("shareLink not implemented"); }
     toggle(options) {
         const {toggles, value} = options;
         this[options.toggles] = options.value;
         console.log(`Toggled ${toggles} to ${value}`)
         $(`.toggle[data-toggles=${toggles}] .toggle-option[data-value=true]`).toggleClass("selected", value);
         $(`.toggle[data-toggles=${toggles}] .toggle-option[data-value=false]`).toggleClass("selected", !value);
+    }
+    shareLink()         { console.log("shareLink not implemented"); }
+    clear() {
+        if (!window.confirm("Are you sure you want to delete your blueprint?")) return;
+        this.origin = [0,0];
+        this.polygons = [];
+        this.icons = [];
+        this.title = "";
+        this.zoom = 1.0;
+        this.history = [];
+        this.redoHistory = [];
+        this.save();
+        this.redraw();
     }
     
     canvasPos(ev) {
@@ -230,12 +270,28 @@ class Blueprint {
             bp.redraw();
         });
     }
+    bindKeys() {
+        $(document).on("keydown", (ev) => {
+            switch (ev.key) {
+                case ev.ctrlKey && 'z':
+                    ev.preventDefault();
+                    this.undo();
+                    break;
+                case ev.ctrlKey && 'y':
+                    ev.preventDefault();
+                    this.redo();
+                    break;
+            }
+        });
+    }
 }
 
 $(document).ready((ev) => {
     const bp = window.bp = new Blueprint();
-    //bp.restore();
-    bp.redraw();
+    bp.restore(); // Restore save
+    bp.bindMouse();
+    bp.bindKeys();
+    $(window).on("resize", bp.redraw.bind(bp));
 
     // Initialize toggles
     $(".toggle").each((i, t) => {
@@ -247,7 +303,7 @@ $(document).ready((ev) => {
         bp.toggle({toggles: varName, value: bp[varName]});
     });
 
-    //  Initialize tools
+    //  Initialize tool icons in toolbar
     $(".tool").data("function", "selectTool").addClass("action");
     // TODO: Tooltips for tool icons
     bp.selectTool({tool: $(".tool.selected").data("tool")});
@@ -259,5 +315,4 @@ $(document).ready((ev) => {
         bp[dispatch].bind(bp)(options);
     });
 
-    bp.bindMouse();
 });

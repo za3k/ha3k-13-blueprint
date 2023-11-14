@@ -12,7 +12,6 @@ div.draw-area {
 }
 div.draw-area canvas {
     display: block;
-    border: thin dashed red;
     position: absolute;
     bottom: 0;
     top: 0;

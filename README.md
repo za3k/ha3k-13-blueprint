@@ -1,4 +1,8 @@
-Hack-A-Blueprint is a tool to 
+Hack-A-Blueprint is a tool to draw house floorplans and blueprints.
+
+A demo can be [seen here](https://za3k.github.io/ha3k-13-blueprint/).
+
+It was made in one day by za3k as part of [hack-a-day](https://za3k.com/hackaday).
 
 Feature list:
  [x] Add a canvas area with drawn polygons
@@ -6,10 +10,11 @@ Feature list:
  [x] Add a toolbar with a rectangle draw tool
  [x] Add save/restore and autosave
  [x] Tool: Rectangle draw
- [ ] Add polygon merging
- [ ] Add/subtract mode toggle
- [ ] Add undo/redo
- [ ] Grid snap/nosnap mode toggle
+ [x] Add undo/redo
+ [x] Add clear button
+ [x] Add polygon merging
+ [x] Add/subtract mode toggle
+ [x] Grid snap/nosnap mode toggle
  [ ] Add icons
     [ ] Add a large number of specific icons
  [ ] Add text
