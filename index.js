@@ -2,6 +2,7 @@ function deepcopy(x) { return JSON.parse(JSON.stringify(x)); }
 
 class Tool {
     emptyAction = { };
+    allowSnap = true;
     constructor(bp, ...args) {
         this.partialAction = deepcopy(this.emptyAction); // A tool may have started being used, and is incomplete
         this.bp = bp;
@@ -101,7 +102,6 @@ class IconTool extends Tool {
                 icon: this.partialAction.icon,
             });
         });
-        //this.forgetState();
     }
     renderPreview(ctx) {
         if (!this.partialAction.mousePosition) return;
@@ -140,7 +140,37 @@ class IconTool extends Tool {
         ctx.restore()
     }
 }
-class PanTool extends Tool { }
+class PanTool extends Tool {
+    emptyAction = { dragging: false };
+    allowSnap = false;
+    onMouseMove(canvasPoint) {
+        super.onMouseMove(canvasPoint);
+        if (this.partialAction.dragging) {
+            const [dx, dy] = 
+                [this.partialAction.startDrag.x - this.partialAction.mousePosition.x,
+                 this.partialAction.startDrag.y - this.partialAction.mousePosition.y];
+            const [tx, ty] = [
+                this.partialAction.startOrigin.x + dx*bp.scale,
+                this.partialAction.startOrigin.y + dy*bp.scale];
+            this.origin = {x: tx, y: ty};
+        }
+    }
+    onMouseDown(canvasPoint) {
+        super.onMouseDown(canvasPoint);
+        this.partialAction.dragging = true;
+        this.partialAction.startDrag = canvasPoint;
+        this.partialAction.startOrigin = bp.origin;
+    }
+    onMouseUp(canvasPoint) {
+        this.forgetState();
+        if (this.origin) {
+            bp.origin = this.origin;
+            delete this.origin;
+        }
+        super.onMouseUp(canvasPoint);
+    }
+    renderPreview(ctx) { }
+}
 class SelectTool extends Tool { }
 class PolygonTool extends Tool {
 
@@ -151,7 +181,7 @@ class Blueprint {
     constructor() {
         this.persisted = ["polygons", "objects", "title", "autosave"];
         // NOT persisted: viewport position and zoom, tool state, undo/redo history
-        this.origin = [0,0];
+        this.origin = {x: 0, y: 0};
 
         // A "MultiPolygon": Array of polygons
         // A "Polygon": Array of rings (first exterior, others "holes")
@@ -265,17 +295,19 @@ class Blueprint {
         canvas.width = window.innerWidth;
         var ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        const origin = (this.currentTool && this.currentTool.origin) || this.origin;
+        ctx.translate(-origin.x, -origin.y);
         ctx.scale(this.scale, this.scale);
-        console.log(this.scale);
         const size = { width: canvas.width / this.scale,
                        height: canvas.height / this.scale }
 
-        // Draw grid dots
+        // Draw grid dots. Complicated because there are infinity of them.
         var dotSpacing = this.gridSize;
         // Draw less dots when you zoom out, to improve performance
         while (Math.max(size.width, size.height) / dotSpacing > 100) dotSpacing *= 2;
-        for (var i = -dotSpacing; i < size.width + dotSpacing; i+= dotSpacing) {
-            for (var j = -dotSpacing; j < size.height + dotSpacing; j+= dotSpacing) {
+        var offset = this.snapFloor({x: origin.x/this.scale, y: origin.y/this.scale}, dotSpacing);
+        for (var i = offset.x-dotSpacing; i < offset.x + size.width + dotSpacing; i+= dotSpacing) {
+            for (var j = offset.y-dotSpacing; j < offset.y + size.height + dotSpacing; j+= dotSpacing) {
                 ctx.fillStyle = "#000";
                 ctx.strokeWidth = 1;
                 ctx.beginPath();
@@ -342,6 +374,12 @@ class Blueprint {
             y: Math.round(point.y/this.snapSize)*this.snapSize,
         }
     }
+    snapFloor(point, snapSize) {
+        return {
+            x: Math.floor(point.x/snapSize)*snapSize,
+            y: Math.floor(point.y/snapSize)*snapSize,
+        }
+    }
     selectIcon(options) {
         const icon = options.value;
         $(".icon.selected").removeClass("selected");
@@ -377,59 +415,74 @@ class Blueprint {
     shareLink()         { console.log("shareLink not implemented"); }
     clear() {
         if (!window.confirm("Are you sure you want to delete your blueprint?")) return;
-        this.origin = [0,0];
+        this.origin = {x: 0, y: 0};
         this.polygons = [];
         this.objects = [];
         this.title = "";
-        this.zoom = 1.0;
+        this.scale = 1.0;
         this.history = [];
         this.redoHistory = [];
         this.save();
         this.redraw();
     }
     
-    canvasPos(ev) {
+    canvasPos(ev, noSnap) {
+        // Convert mouse coordinates
         const rect = bp.canvas.getBoundingClientRect();
         var p = { x: ev.clientX, y: ev.clientY }
         p = {
             x: p.x - rect.left,
             y: p.y - rect.top,
         };
-        // Scale
+
+        // Un-Transform
+        p = {
+            x: p.x + this.origin.x,
+            y: p.y + this.origin.y,
+        }
+
+        // Un-Scale
         p = {
             x: p.x / this.scale,
             y: p.y / this.scale,
         };
-        // Transform
+
+        // Snap
         if (this.gridSnap) p = this.snap(p);
         return p;
     }
     zoom(pos, factor) {
+        // We scale up, and then want "pos" to a fixpoint of the zoom+translate
+        const oldScale = this.scale;
         this.scale = Math.max(Math.min(this.scale*factor, 10.0), 0.1);
+        const s = 1 - (this.scale / oldScale);
+        const [dx, dy] = [pos.x * s, pos.y * s];
+        this.origin.x -= dx * oldScale;
+        this.origin.y -= dy * oldScale;
         this.redraw();
     }
     bindMouse() {
         $(document).on("mousemove", (ev) => {
             if(!bp.currentTool) return;
-            bp.currentTool.onMouseMove(bp.canvasPos(ev));
+            bp.currentTool.onMouseMove(bp.canvasPos(ev, bp.currentTool.allowSnap));
             bp.redraw();
         }).on("mousedown", (ev) => {
             if(!bp.currentTool) return;
             if (event.button == 0) {
-                bp.currentTool.onMouseDown(bp.canvasPos(ev));
+                bp.currentTool.onMouseDown(bp.canvasPos(ev, bp.currentTool.allowSnap));
                 bp.redraw();
             }
             // TODO: Right click to pan
         }).on("mouseup", (ev) => {
             if(!bp.currentTool) return;
             if (event.button == 0) {
-                bp.currentTool.onMouseUp(bp.canvasPos(ev));
+                bp.currentTool.onMouseUp(bp.canvasPos(ev, bp.currentTool.allowSnap));
                 bp.redraw();
             }
         });
         $(window).on('mousewheel', (ev) => {
             ev = ev.originalEvent;
-            const pos = bp.canvasPos(ev);
+            const pos = bp.canvasPos(ev, false);
             bp.zoom(pos, Math.exp(0.0003 * -ev.deltaY));
         });
     }
