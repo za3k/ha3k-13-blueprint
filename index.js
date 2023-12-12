@@ -348,8 +348,10 @@ class Blueprint {
         }
     }
     doAction(name, a) {
-        // TODO: Add action name to the history
-        this.history.push(deepcopy(this.state));
+        this.history.push({
+            name: name,
+            state: deepcopy(this.state)
+        });
         a();
         this.redoHistory = [];
         this.redraw();
@@ -357,15 +359,23 @@ class Blueprint {
     }
     undo() {
         if (this.history.length == 0) return;
-        this.redoHistory.push(this.state);
-        this.state = this.history.pop();
+        const action = this.history.pop();
+        this.redoHistory.push({
+            name: action.name,
+            state: this.state
+        });
+        this.state = action.state;
         this.redraw();
         if (this.autosave) this.save();
     }
     redo() {
         if (this.redoHistory.length == 0) return;
-        this.history.push(this.state);
-        this.state = this.redoHistory.pop();
+        const action = this.redoHistory.pop();
+        this.history.push({
+            name: action.name,
+            state: this.state
+        })
+        this.state = action.state;
         this.redraw();
         if (this.autosave) this.save();
     }
@@ -447,7 +457,7 @@ class Blueprint {
         return p;
     }
     zoom(pos, factor) {
-        // We scale up, and then want "pos" to a fixpoint of the zoom+translate
+        // We scale up, and then want "pos" to be a fixpoint of the zoom+translate
         const oldScale = this.scale;
         this.scale = Math.max(Math.min(this.scale*factor, 10.0), 0.1);
         const s = 1 - (this.scale / oldScale);
