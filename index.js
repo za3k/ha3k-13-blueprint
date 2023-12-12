@@ -305,14 +305,15 @@ class Blueprint {
         var dotSpacing = this.gridSize;
         // Draw less dots when you zoom out, to improve performance
         while (Math.max(size.width, size.height) / dotSpacing > 100) dotSpacing *= 2;
-        var offset = this.snapFloor({x: origin.x/this.scale, y: origin.y/this.scale}, dotSpacing);
-        for (var i = offset.x-dotSpacing; i < offset.x + size.width + dotSpacing; i+= dotSpacing) {
-            for (var j = offset.y-dotSpacing; j < offset.y + size.height + dotSpacing; j+= dotSpacing) {
+
+        const originScaled = {x: origin.x / this.scale, y: origin.y / this.scale};
+        for (var i = Math.floor(originScaled.x/dotSpacing)-1; i < (originScaled.x + size.width) / dotSpacing + 1; i++) {
+            for (var j = Math.floor(originScaled.y/dotSpacing)-1; j < (originScaled.y + size.height) / dotSpacing + 1; j++) {
                 ctx.fillStyle = "#000";
                 ctx.strokeWidth = 1;
                 ctx.beginPath();
                 const radius = Math.max(0.5, 0.5/this.scale);
-                ctx.arc(i, j, radius, 0, 2 * Math.PI);
+                ctx.arc(dotSpacing * i, dotSpacing * j, radius, 0, 2 * Math.PI);
                 ctx.fill();
             }
         }
@@ -372,12 +373,6 @@ class Blueprint {
         return {
             x: Math.round(point.x/this.snapSize)*this.snapSize,
             y: Math.round(point.y/this.snapSize)*this.snapSize,
-        }
-    }
-    snapFloor(point, snapSize) {
-        return {
-            x: Math.floor(point.x/snapSize)*snapSize,
-            y: Math.floor(point.y/snapSize)*snapSize,
         }
     }
     selectIcon(options) {
