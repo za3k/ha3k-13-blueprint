@@ -142,7 +142,9 @@ class IconTool extends Tool {
 }
 class PanTool extends Tool { }
 class SelectTool extends Tool { }
-class PolygonTool extends Tool { }
+class PolygonTool extends Tool {
+
+}
 class TextTool extends Tool { }
 
 class Blueprint {
@@ -163,7 +165,7 @@ class Blueprint {
         this.snapSize = 10;
         this.selectedIcon = null;
         this.title = "";
-        this.zoom = 1.0;
+        this.scale = 1.0;
         this.history = [];
         this.redoHistory = [];
         this.autosave = true;
@@ -263,14 +265,21 @@ class Blueprint {
         canvas.width = window.innerWidth;
         var ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.scale(this.scale, this.scale);
+        console.log(this.scale);
+        const size = { width: canvas.width / this.scale,
+                       height: canvas.height / this.scale }
 
         // Draw grid dots
-        for (var i = -this.gridSize; i < canvas.width + this.gridSize; i+= this.gridSize) {
-            for (var j = -this.gridSize; j < canvas.height + this.gridSize; j+= this.gridSize) {
+        var dotSpacing = this.gridSize;
+        // Draw less dots when you zoom out, to improve performance
+        while (Math.max(size.width, size.height) / dotSpacing > 100) dotSpacing *= 2;
+        for (var i = -dotSpacing; i < size.width + dotSpacing; i+= dotSpacing) {
+            for (var j = -dotSpacing; j < size.height + dotSpacing; j+= dotSpacing) {
                 ctx.fillStyle = "#000";
                 ctx.strokeWidth = 1;
                 ctx.beginPath();
-                const radius = 0.5 / this.zoom;
+                const radius = Math.max(0.5, 0.5/this.scale);
                 ctx.arc(i, j, radius, 0, 2 * Math.PI);
                 ctx.fill();
             }
@@ -293,14 +302,14 @@ class Blueprint {
         ctx.fill()
         ctx.stroke()
 
+        // Draw icons
         for (var object of this.objects) {
-            if (object.type == "icon") {
-                this.TOOLS.icon.render(ctx, object);
-            } else {
-                console.log(`Unknown object type: ${object.type}`);
-            }
+            if (object.type == "icon") this.TOOLS.icon.render(ctx, object);
         }
 
+        // TODO: Draw text
+
+        // Draw current tool preview
         if (this.currentTool) {
             this.currentTool.renderPreview(ctx);
         }
@@ -386,8 +395,18 @@ class Blueprint {
             x: p.x - rect.left,
             y: p.y - rect.top,
         };
+        // Scale
+        p = {
+            x: p.x / this.scale,
+            y: p.y / this.scale,
+        };
+        // Transform
         if (this.gridSnap) p = this.snap(p);
         return p;
+    }
+    zoom(pos, factor) {
+        this.scale = Math.max(Math.min(this.scale*factor, 10.0), 0.1);
+        this.redraw();
     }
     bindMouse() {
         $(document).on("mousemove", (ev) => {
@@ -396,13 +415,22 @@ class Blueprint {
             bp.redraw();
         }).on("mousedown", (ev) => {
             if(!bp.currentTool) return;
-            if (event.which !== 1) return;
-            bp.currentTool.onMouseDown(bp.canvasPos(ev));
-            bp.redraw();
+            if (event.button == 0) {
+                bp.currentTool.onMouseDown(bp.canvasPos(ev));
+                bp.redraw();
+            }
+            // TODO: Right click to pan
         }).on("mouseup", (ev) => {
             if(!bp.currentTool) return;
-            bp.currentTool.onMouseUp(bp.canvasPos(ev));
-            bp.redraw();
+            if (event.button == 0) {
+                bp.currentTool.onMouseUp(bp.canvasPos(ev));
+                bp.redraw();
+            }
+        });
+        $(window).on('mousewheel', (ev) => {
+            ev = ev.originalEvent;
+            const pos = bp.canvasPos(ev);
+            bp.zoom(pos, Math.exp(0.0003 * -ev.deltaY));
         });
     }
     bindKeys() {
