@@ -132,18 +132,23 @@ class IconTool extends Tool {
         ctx.rotate(rotation);
 
         if (object.preview) ctx.globalAlpha = 0.1;
-        if (object.highlight) {
-            ctx.fillStyle = "rgba(0, 0, 255, 0.2)";
-            ctx.strokeStyle = "#00f";
-            ctx.lineWidth = 3;
+        if (object.selected || object.highlight) {
+            if (object.selected) {
+                ctx.strokeStyle = "#55f";
+                ctx.lineWidth = 2;
+            } else if (object.highlight) {
+                ctx.fillStyle = "rgba(200, 200, 255, 0.5)";
+                ctx.strokeStyle = "grey";
+                ctx.lineWidth = 5;
+            }
             ctx.beginPath();
-            const b = 3;
+            const b = 5;
             ctx.moveTo(-width/2-b, -height/2-b);
             ctx.lineTo( width/2+b, -height/2-b);
             ctx.lineTo( width/2+b,  height/2+b);
             ctx.lineTo(-width/2-b,  height/2+b);
             ctx.closePath();
-            ctx.fill();
+            if (object.highlight) ctx.fill();
             ctx.stroke();
         }
         ctx.drawImage(
@@ -247,12 +252,16 @@ class SelectTool extends Tool {
     }
     renderPreviewBefore(ctx) { 
         const hover = this.findThing(this.partialAction.mousePosition);
-        if (hover) hover.highlight = true;
+        const selected = this.partialAction.selection;
+        if (selected) selected.selected = true;
+        if (hover && !hover.selected) hover.highlight = true;
     }
     renderPreview(ctx) { 
         const hover = this.findThing(this.partialAction.mousePosition);
         const dragging = this.partialAction.dragging;
+        const selected = this.partialAction.selection;
         if (hover) delete hover.highlight;
+        if (selected) delete selected.selected;
 
         // TODO: Figure out how NOT to draw a selected thing in the normal way, also.
 
