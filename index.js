@@ -31,16 +31,17 @@ class RectangleTool extends Tool {
         this.partialAction.start = this.partialAction.mousePosition = canvasPoint;
     }
     onMouseUp(canvasPoint) {
+        if (!this.partialAction.draw) return;
         const start = this.partialAction.start, stop=canvasPoint;
         const [l, r] = [Math.min(start.x, stop.x), Math.max(start.x, stop.x)];
         const [t, b] = [Math.min(start.y, stop.y), Math.max(start.y, stop.y)];
         const rect = [[l, t], [r, t], [r, b], [l, b], [l, t]];
         if (this.bp.drawErase) {
-            this.bp.doAction(() => {
+            this.bp.doAction("Draw Rectangle", () => {
                 this.bp.erasePoly([rect]);
             });
         } else {
-            this.bp.doAction(() => {
+            this.bp.doAction("Erase Rectangle", () => {
                 this.bp.addPoly([rect]);
             });
         }
@@ -85,6 +86,59 @@ class RectangleTool extends Tool {
     }
 }
 class IconTool extends Tool {
+    emptyAction = { icon: null };
+    selectIcon(icon) {
+        this.partialAction.icon = icon;
+    }
+    onMouseDown(canvasPoint) {
+        if (!this.partialAction.icon) return;
+
+        this.partialAction.mousePosition = canvasPoint;
+        this.bp.doAction("Place Icon", () => {
+            this.bp.addObject({
+                type: "icon",
+                bottomRight: this.partialAction.mousePosition,
+                icon: this.partialAction.icon,
+            });
+        });
+        //this.forgetState();
+    }
+    renderPreview(ctx) {
+        if (!this.partialAction.mousePosition) return;
+        if (!this.partialAction.icon) return;
+
+        // Render a preview
+        this.render(ctx, {
+            type: "icon",
+            bottomRight: this.partialAction.mousePosition,
+            icon: this.partialAction.icon,
+            preview: true
+        });
+    }
+    render(ctx, object) {
+        if (!object.type == "icon") return;
+        ctx.save()
+
+        const icon = bp.ICONS[object.icon];
+        const [width, height] = icon.size || [32, 32];
+        const img = $(`.icon[data-value="${icon.id}"] img`)[0];
+        const scaleX = bp.ROTATION.scaleX[icon.rotation];
+        const rotation = bp.ROTATION.rotate[icon.rotation] / 180 * Math.PI;
+        const [x, y] = [object.bottomRight.x - width/2, object.bottomRight.y - height/2];
+
+        ctx.translate(x, y);
+        ctx.scale(scaleX, 1);
+        ctx.rotate(rotation);
+
+        if (object.preview) ctx.globalAlpha = 0.1;
+        ctx.drawImage(
+            img,
+            -width/2, -height/2,
+            width, height
+        );
+
+        ctx.restore()
+    }
 }
 class PanTool extends Tool { }
 class SelectTool extends Tool { }
@@ -93,7 +147,7 @@ class TextTool extends Tool { }
 
 class Blueprint {
     constructor() {
-        this.persisted = ["polygons", "icons", "title", "autosave"];
+        this.persisted = ["polygons", "objects", "title", "autosave"];
         // NOT persisted: viewport position and zoom, tool state, undo/redo history
         this.origin = [0,0];
 
@@ -122,9 +176,10 @@ class Blueprint {
             icon: new IconTool(this),
             text: new TextTool(this),
         };
-        const ROTATION = {
+        this.ROTATION = {
             name: ["North", "East", "West", "South", "North, Flipped", "East, Flipped", "West, Flipped", "South, Flipped"],
-            transform: ["", "rotate(90deg)", "rotate(180deg)", "rotate(270deg)", "scaleX(-1)", "scaleX(-1),rotate(90deg)", "scaleX(-1),rotate(180deg)", "scaleX(-1),rotate(270deg)"],
+            scaleX: [1,1,1,1,-1,-1,-1,-1],
+            rotate: [0, 90, 180, 270, 0, 90, 180, 270],
         }
         const ROT2 = [0,1];
         const ROT4 = [0,1,2,3];
@@ -147,7 +202,7 @@ class Blueprint {
                     delete copy.rotations;
                     copy.rotation = r;
                     copy.id = `${icon.name} : ${r}`;
-                    //copy.name = `${icon.name} (${ROTATION.name[r]})`;
+                    //copy.name = `${icon.name} (${this.ROTATION.name[r]})`;
                     this.ICONS[copy.id] = copy;
                 }
             } else {
@@ -159,7 +214,14 @@ class Blueprint {
         for (var [id, icon] of Object.entries(this.ICONS)) {
             const [width, height] = icon.size || [32, 32];
             const iconSelector = $(`<div class="icon action" data-function="selectIcon" data-value="${icon.id}"><img src="${icon.image}" alt="${icon.text}" width=${width} height=${height}/><span class="icon-name">${icon.name}</span></div>`);
-            iconSelector.find("img").css("transform", ROTATION.transform[icon.rotation]);
+            if (icon.rotation) {
+                var transforms = [];
+                const [scaleX, rotation] = [this.ROTATION.scaleX[icon.rotation], this.ROTATION.rotate[icon.rotation]];
+                if (scaleX !== 1) transforms.push(`scaleX(${scaleX})`);
+                if (rotation !== 0) transforms.push(`rotate(${rotation}deg)`);
+                const transform = transforms.join(" ");
+                iconSelector.find("img").css("transform", transform);
+            }
             $(".icons").append(iconSelector);
         }
     }
@@ -192,6 +254,9 @@ class Blueprint {
     erasePoly(poly) {
         this.polygons = polygonClipping.difference(this.polygons, poly);
     }
+    addObject(object) {
+        this.objects.push(object);
+    } 
     redraw() {
         const canvas = this.canvas;
         canvas.height = window.innerHeight;
@@ -228,11 +293,19 @@ class Blueprint {
         ctx.fill()
         ctx.stroke()
 
+        for (var object of this.objects) {
+            if (object.type == "icon") {
+                this.TOOLS.icon.render(ctx, object);
+            } else {
+                console.log(`Unknown object type: ${object.type}`);
+            }
+        }
+
         if (this.currentTool) {
             this.currentTool.renderPreview(ctx);
         }
     }
-    doAction(a) {
+    doAction(name, a) {
         // TODO: Add action name to the history
         this.history.push(deepcopy(this.state));
         a();
@@ -245,12 +318,14 @@ class Blueprint {
         this.redoHistory.push(this.state);
         this.state = this.history.pop();
         this.redraw();
+        if (this.autosave) this.save();
     }
     redo() {
         if (this.redoHistory.length == 0) return;
         this.history.push(this.state);
         this.state = this.redoHistory.pop();
         this.redraw();
+        if (this.autosave) this.save();
     }
     snap(point) {
         return {
@@ -263,7 +338,7 @@ class Blueprint {
         $(".icon.selected").removeClass("selected");
         $(`.icon[data-value="${icon}"]`).addClass("selected");
         this.selectedIcon = icon;
-        //this.currentTool.selectIcon(icon);
+        this.currentTool.selectIcon(icon);
     }
     selectTool(options) {
         const tool = options.tool
@@ -295,7 +370,7 @@ class Blueprint {
         if (!window.confirm("Are you sure you want to delete your blueprint?")) return;
         this.origin = [0,0];
         this.polygons = [];
-        this.icons = [];
+        this.objects = [];
         this.title = "";
         this.zoom = 1.0;
         this.history = [];
@@ -321,6 +396,7 @@ class Blueprint {
             bp.redraw();
         }).on("mousedown", (ev) => {
             if(!bp.currentTool) return;
+            if (event.which !== 1) return;
             bp.currentTool.onMouseDown(bp.canvasPos(ev));
             bp.redraw();
         }).on("mouseup", (ev) => {

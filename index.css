@@ -3,6 +3,20 @@
   user-select: none;
 }
 
+/*
+body::before {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 1rem; 
+    color: red;
+    text-align: center;
+    color: red;
+    font-size: 4rem;
+    content: "NOT FINISHED";
+}
+*/
+
 div.draw-area {
     position: fixed;
     top: 0;
@@ -40,9 +54,32 @@ div.draw-area canvas {
     font-size: 10pt;
     padding: 0.2rem;
 }
+.icons::before,
+.fonts::before,
+.tools::before,
+.settings::before {
+    height: 100%;
+    margin: 0 2rem 0 0;
+    display: inline-block;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+.icons::before {
+    content: "icons";
+}
+.fonts::before {
+    content: "fonts";
+}
+.settings::before {
+    content: "settings";
+}
+.tools::before {
+    content: "tools";
+}
 .icons > h3 {
     margin: 0 2rem 0 0;
     display: inline-block;
+    height: 100%; /* Doesn't work, TODO */
 }
 .icon > img {
     display: block;
