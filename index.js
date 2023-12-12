@@ -12,6 +12,7 @@ class Tool {
     onMouseDown(canvasPoint) { this.partialAction.mousePosition = canvasPoint; }
     onMouseUp(canvasPoint) { this.partialAction.mousePosition = canvasPoint; }
     renderPreview(ctx) { } // Render a preview for mouse hover, partial draw, etc.
+    renderPreviewBefore(ctx) { }
 }
 
 // Single-click, multiple clicks, drag motion
@@ -131,6 +132,20 @@ class IconTool extends Tool {
         ctx.rotate(rotation);
 
         if (object.preview) ctx.globalAlpha = 0.1;
+        if (object.highlight) {
+            ctx.fillStyle = "rgba(0, 0, 255, 0.2)";
+            ctx.strokeStyle = "#00f";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            const b = 3;
+            ctx.moveTo(-width/2-b, -height/2-b);
+            ctx.lineTo( width/2+b, -height/2-b);
+            ctx.lineTo( width/2+b,  height/2+b);
+            ctx.lineTo(-width/2-b,  height/2+b);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
         ctx.drawImage(
             img,
             -width/2, -height/2,
@@ -169,9 +184,94 @@ class PanTool extends Tool {
         }
         super.onMouseUp(canvasPoint);
     }
-    renderPreview(ctx) { }
 }
-class SelectTool extends Tool { }
+class SelectTool extends Tool { 
+    /* Select, edit, or move */
+    emptyAction = { mouseDown: false, selection: null };
+    allowSnap = false; // Complicated!
+
+    onMouseMove(canvasPoint) {
+        this.partialAction.mousePosition = canvasPoint;
+
+        if (this.partialAction.selection && this.partialAction.mouseDown) {
+            const [dx, dy] = [canvasPoint.x - this.partialAction.startDrag.x, canvasPoint.y - this.partialAction.startDrag.y];
+            // Update preview
+            this.partialAction.selection.bottomRight = {
+                x: dx + this.partialAction.originalBottomRight.x,
+                y: dy + this.partialAction.originalBottomRight.y
+            };
+        }
+    }
+    onMouseDown(canvasPoint) {
+        // Select a thing
+        this.partialAction.selection = this.findThing(canvasPoint);
+        this.partialAction.mouseDown = true;
+
+        this.partialAction.mousePosition = this.partialAction.startDrag = canvasPoint;
+        if (this.partialAction.selection) {
+            this.allowSnap = true; // Moving snaps
+            this.partialAction.originalBottomRight = this.partialAction.selection.bottomRight;
+        }
+    }
+    onMouseUp(canvasPoint) {
+        // Move a thing, possibly
+        if (this.partialAction.selection) {
+            this.onMouseMove(canvasPoint);
+            delete this.partialAction.originalBottomRight;
+        }
+
+        // Reset drag
+        this.partialAction.mousePosition = canvasPoint;
+        this.partialAction.mouseDown = false;
+        this.allowSnap = false;
+        delete this.partialAction.startDrag;
+
+        // Selection does not change
+    }
+    findThing(mouse) {
+        // Find the object under the mouse, if any
+        for (var obj of bp.objects) {
+            if (this.intersect(obj, mouse)) return obj;
+        }
+    }
+    intersect(object, mouse) {
+        if (object.type == "icon") {
+            const icon = bp.ICONS[object.icon];
+            const [width, height] = icon.size || [32, 32];
+            return (object.bottomRight.x - width <= mouse.x &&
+                    mouse.x <= object.bottomRight.x &&
+                    object.bottomRight.y - height <= mouse.y &&
+                    mouse.y <= object.bottomRight.y);
+        }
+
+    }
+    renderPreviewBefore(ctx) { 
+        const hover = this.findThing(this.partialAction.mousePosition);
+        if (hover) hover.highlight = true;
+    }
+    renderPreview(ctx) { 
+        const hover = this.findThing(this.partialAction.mousePosition);
+        const dragging = this.partialAction.dragging;
+        if (hover) delete hover.highlight;
+
+        // TODO: Figure out how NOT to draw a selected thing in the normal way, also.
+
+        // While mouse is up AND mouse is over something not selected, draw it highlighted in a border
+        if (!dragging && hover) {
+            // Draw a nice border
+
+        }
+
+        // While mouse is up AND mouse is over something already selected, show a special icon
+
+        // While something is selected, show it specially.
+
+        // While mouse is down AND something is selected, show it being dragged
+        
+        // TODO: While mouse is down AND nothing is selected, show a rectangle selection preview of multi-select
+
+    } 
+}
 class PolygonTool extends Tool {
 
 }
@@ -318,6 +418,8 @@ class Blueprint {
             }
         }
 
+        if (this.currentTool) this.currentTool.renderPreviewBefore(ctx);
+
         // Draw polygons
         ctx.fillStyle = "brown";
         ctx.strokeStyle = "black";
@@ -343,9 +445,7 @@ class Blueprint {
         // TODO: Draw text
 
         // Draw current tool preview
-        if (this.currentTool) {
-            this.currentTool.renderPreview(ctx);
-        }
+        if (this.currentTool) this.currentTool.renderPreview(ctx);
     }
     doAction(name, a) {
         this.history.push({
@@ -473,7 +573,7 @@ class Blueprint {
             bp.redraw();
         }).on("mousedown", (ev) => {
             if(!bp.currentTool) return;
-            if (event.button == 0) {
+            if (event.button == 0 && ev.target.nodeName == "CANVAS") {
                 bp.currentTool.onMouseDown(bp.canvasPos(ev, bp.currentTool.allowSnap));
                 bp.redraw();
             }
