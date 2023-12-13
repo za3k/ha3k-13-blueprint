@@ -377,7 +377,7 @@ class Blueprint {
                 const transform = transforms.join(" ");
                 iconSelector.find("img").css("transform", transform);
             }
-            $(".icons").append(iconSelector);
+            $(".icons > div").append(iconSelector);
         }
     }
     get canvas() {
@@ -526,7 +526,7 @@ class Blueprint {
         console.log(`Tool ${tool} selected`);
         $(".tool.selected").removeClass("selected");
         $(`.tool[data-tool=${tool}]`).addClass("selected");
-        $(".icons").toggle(tool === "icon");
+        $(".icons").css("display", tool === "icon" ? "flex" : "");
 
         if (!this.TOOLS[options.tool]) {
             console.log(`tool ${tool} not implemented`);
@@ -671,7 +671,7 @@ $(document).ready((ev) => {
     $(".toggle").each((i, t) => {
         t = $(t);
         var varName = t.data("toggles");
-        t.append(`<div class="toggle-title">${t.data("toggle-name")}</div>`)
+        t.append(`<span class="toggle-title">${t.data("toggle-name")}</span>`)
          .append(`<div class="toggle-option action" data-function="toggle" data-toggles="${varName}" data-value="false">${t.data("false-name")}</div>`)
          .append(`<div class="toggle-option action" data-function="toggle" data-toggles="${varName}" data-value="true">${t.data("true-name")}</div>`);
         bp.toggle({toggles: varName, value: bp[varName]});

@@ -32,6 +32,17 @@ div.draw-area canvas {
     right: 0;
 }
 
+.toolbar, .icons, .tools, .settings, .toggle {
+    display: flex;
+    align-items:center;
+}
+
+.tools, .settings, .toggle {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    height: 100%;
+}
+
 .icons, .fonts {
     position: fixed;
     display: none;
@@ -57,11 +68,11 @@ div.draw-area canvas {
 .fonts::before,
 .tools::before,
 .settings::before {
-    height: 100%;
     margin: 0 2rem 0 0;
     display: inline-block;
-    font-size: 1.2em;
+    font-size: 1.6em;
     font-weight: bold;
+    color: green
 }
 .icons::before {
     content: "icons";
@@ -74,11 +85,6 @@ div.draw-area canvas {
 }
 .tools::before {
     content: "tools";
-}
-.icons > h3 {
-    margin: 0 2rem 0 0;
-    display: inline-block;
-    height: 100%; /* Doesn't work, TODO */
 }
 .icon > img {
     display: block;
@@ -107,14 +113,14 @@ div.draw-area canvas {
     height: 3rem;
     background: white;
     border-top: 2px dashed lightgrey;
-}
-
-.toolbar > *, .tools > *, .settings > *, .toggle > * {
-    display: inline-block;
+    display: flex;
 }
 
 .tool {
     cursor: pointer;
+}
+.tools > * {
+    padding: 5px;
 }
 .toolbar .incomplete {
     text-decoration: line-through;
@@ -139,7 +145,23 @@ div.draw-area canvas {
 .toggle-option {
     cursor: pointer;
     color: grey;
+    border-color: black;
+    border-style: solid;
+    border-width: 0px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
 }
+.toggle-option:first-of-type {
+    border-left-width: 1px;
+    border-top-left-radius: 10px;
+    border-bottom-left-radius: 10px;
+}
+.toggle-option:last-of-type {
+    border-right-width: 1px;
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
 .toggle-option:hover {
     color: black;
 }
