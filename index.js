@@ -321,6 +321,7 @@ class Blueprint {
         this.history = [];
         this.redoHistory = [];
         this.autosave = true;
+        this.saveKey = "blueprint";
 
         this.TOOLS = {
             rectangle: new RectangleTool(this),
@@ -395,11 +396,12 @@ class Blueprint {
         }
     }
     save() {
-        localStorage.setItem("blueprint", JSON.stringify(this.state));
+        localStorage.setItem(this.saveKey, JSON.stringify(this.state));
     }
     restore() {
-        if (localStorage.getItem("blueprint"))
-          this.state = JSON.parse(localStorage.getItem("blueprint"));
+        if (localStorage.getItem(this.saveKey)) {
+          this.state = JSON.parse(localStorage.getItem(this.saveKey));
+        }
         this.redraw();
     }
     addPoly(poly) {
@@ -544,7 +546,25 @@ class Blueprint {
         $(`.toggle[data-toggles=${toggles}] .toggle-option[data-value=true]`).toggleClass("selected", value);
         $(`.toggle[data-toggles=${toggles}] .toggle-option[data-value=false]`).toggleClass("selected", !value);
     }
-    shareLink()         { console.log("shareLink not implemented"); }
+    addUrlParameter(url, name, value) {
+        name = encodeURIComponent(name);
+        value = encodeURIComponent(value);
+        return `${url}?${name}=${value}`
+    }
+    shareLink() {
+        const state = JSON.stringify(this.state);
+        const link = this.addUrlParameter(window.location.href, "share", state);
+        navigator.clipboard.writeText(link);
+        alert("Copied link to clipboard");
+    }
+    loadSharedLink() {
+        const sharedState = new URLSearchParams(window.location.search).get("share");
+        if (sharedState) {
+            this.saveKey = "shared"; // Avoid overwriting your save with the shared link
+            this.state = JSON.parse(decodeURIComponent(sharedState));
+        }
+        this.redraw();
+    }
     clear() {
         if (!window.confirm("Are you sure you want to delete your blueprint?")) return;
         this.origin = {x: 0, y: 0};
@@ -642,6 +662,7 @@ class Blueprint {
 $(document).ready((ev) => {
     const bp = window.bp = new Blueprint();
     bp.restore(); // Restore save
+    bp.loadSharedLink(); // Load state from get parameter
     bp.bindMouse();
     bp.bindKeys();
     $(window).on("resize", bp.redraw.bind(bp));
