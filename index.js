@@ -253,29 +253,26 @@ class SelectTool extends Tool {
     renderPreviewBefore(ctx) { 
         const hover = this.findThing(this.partialAction.mousePosition);
         const selected = this.partialAction.selection;
+        const dragging = this.partialAction.dragging;
+
+        // While something is selected, show it specially.
         if (selected) selected.selected = true;
-        if (hover && !hover.selected) hover.highlight = true;
+        // While mouse is up AND mouse is over something not selected, draw it highlighted in a border
+        if (!dragging && hover && !hover.selected) hover.highlight = true;
+
     }
     renderPreview(ctx) { 
         const hover = this.findThing(this.partialAction.mousePosition);
         const dragging = this.partialAction.dragging;
         const selected = this.partialAction.selection;
         if (hover) delete hover.highlight;
-        if (selected) delete selected.selected;
-
-        // TODO: Figure out how NOT to draw a selected thing in the normal way, also.
-
-        // While mouse is up AND mouse is over something not selected, draw it highlighted in a border
-        if (!dragging && hover) {
-            // Draw a nice border
-
-        }
-
-        // While mouse is up AND mouse is over something already selected, show a special icon
 
         // While something is selected, show it specially.
+        // (While mouse is down AND something is selected, show it being dragged)
+        if (selected) delete selected.selected;
 
-        // While mouse is down AND something is selected, show it being dragged
+        // TODO: While mouse is up AND mouse is over something already selected, show a special icon
+
         
         // TODO: While mouse is down AND nothing is selected, show a rectangle selection preview of multi-select
 
@@ -646,4 +643,5 @@ $(document).ready((ev) => {
     });
     $("img").attr("draggable", "false");
 
+    if (window.location.origin == "file://") $("body").addClass("local");
 });

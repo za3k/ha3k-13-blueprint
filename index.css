@@ -3,8 +3,7 @@
   user-select: none;
 }
 
-/*
-body::before {
+body:not(.local)::before {
     position: fixed;
     left: 0;
     right: 0;
@@ -14,8 +13,8 @@ body::before {
     color: red;
     font-size: 4rem;
     content: "NOT FINISHED";
+    z-index: 4;
 }
-*/
 
 div.draw-area {
     position: fixed;
