@@ -11,6 +11,7 @@ class Tool {
     onMouseMove(canvasPoint) { this.partialAction.mousePosition = canvasPoint; }
     onMouseDown(canvasPoint) { this.partialAction.mousePosition = canvasPoint; }
     onMouseUp(canvasPoint) { this.partialAction.mousePosition = canvasPoint; }
+    onDelete() {}
     renderPreview(ctx) { } // Render a preview for mouse hover, partial draw, etc.
     renderPreviewBefore(ctx) { }
 }
@@ -219,10 +220,17 @@ class SelectTool extends Tool {
         }
     }
     onMouseUp(canvasPoint) {
-        // Move a thing, possibly
-        if (this.partialAction.selection) {
+        if (this.partialAction.selection) { // Move
+            // Undo the move preview, so we can record the original position in the action
             this.onMouseMove(canvasPoint);
+            const finalPos = this.partialAction.selection.bottomRight;
+            this.partialAction.selection.bottomRight = this.partialAction.originalBottomRight;
             delete this.partialAction.originalBottomRight;
+
+            // Record the full move as an action
+            bp.doAction("Move Object", () => {
+                this.partialAction.selection.bottomRight = finalPos;
+            });
         }
 
         // Reset drag
@@ -232,6 +240,14 @@ class SelectTool extends Tool {
         delete this.partialAction.startDrag;
 
         // Selection does not change
+    }
+    onDelete() {
+        if (!this.partialAction.selection) return;
+        // Delete the selected thing
+        bp.doAction("Delete Object", () => {
+            bp.deleteObject(this.partialAction.selection);
+        });
+        this.partialAction.selection = null;
     }
     findThing(mouse) {
         // Find the object under the mouse, if any
@@ -395,6 +411,11 @@ class Blueprint {
     addObject(object) {
         this.objects.push(object);
     } 
+    deleteObject(object) {
+        const index = this.objects.findIndex(e => e===object);
+        if (index < 0) return;
+        this.objects.splice(index, 1);
+    }
     redraw() {
         const canvas = this.canvas;
         canvas.height = window.innerHeight;
@@ -607,6 +628,11 @@ class Blueprint {
                 case ev.ctrlKey && 'y':
                     ev.preventDefault();
                     this.redo();
+                    break;
+                case 'Delete':
+                case 'Backspace':
+                    ev.preventDefault();
+                    if (bp.currentTool) bp.currentTool.onDelete()
                     break;
             }
         });
