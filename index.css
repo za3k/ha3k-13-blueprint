@@ -121,6 +121,23 @@ div.draw-area canvas {
 }
 .tools > * {
     padding: 5px;
+    position: relative;
+}
+.tools > * > .tooltip {
+    display: none;
+    position: absolute;
+    background: rgb(40, 40, 40);
+    color: rgb(230, 230, 230);
+    padding: 4px;
+    border-radius: 4px;
+    top: -25px;
+    height: 25px;
+    text-align: center;
+    margin-left: -5px;
+    white-space: nowrap;
+}
+.tools > div:hover > .tooltip {
+    display: block;
 }
 .toolbar .incomplete {
     text-decoration: line-through;

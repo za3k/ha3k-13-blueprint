@@ -679,7 +679,14 @@ $(document).ready((ev) => {
 
     //  Initialize tool icons in toolbar
     $(".tool").data("function", "selectTool").addClass("action");
-    // TODO: Tooltips for tool icons
+    $(".tools > *").each((i, t) => {
+        t = $(t);
+        const toolName = t.data("name");
+        const tooltip = $(`<span class="tooltip">${toolName}</span>`);
+        t.append(tooltip);
+        const dx = tooltip.outerWidth() - t.outerWidth();
+        tooltip.css("left", `${5-Math.floor(dx/2)}px`);
+    });
     bp.selectTool({tool: $(".tool.selected").data("tool")});
 
     // Hook up click actions
