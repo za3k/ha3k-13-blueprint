@@ -53,6 +53,7 @@ class RectangleTool extends Tool {
     }
     renderPreview(ctx) { // Render a preview for mouse hover, partial draw, etc.
         if (!this.partialAction.mousePosition) return;
+        ctx.save();
         if (this.partialAction.draw) {
             // Show a preview of the huge draw rectangle
             const start = this.partialAction.start;
@@ -86,12 +87,20 @@ class RectangleTool extends Tool {
             ctx.fill();
             ctx.stroke();
         }
+        ctx.restore();
     }
 }
 class IconTool extends Tool {
     emptyAction = { icon: null };
     selectIcon(icon) {
         this.partialAction.icon = icon;
+    }
+    iconTopLeft(bottomRight, icon) {
+        const [width, height] = bp.ICONS[this.partialAction.icon].size || [32, 32];
+        return {
+            x: bottomRight.x - width,
+            y: bottomRight.y - height,
+        };
     }
     onMouseDown(canvasPoint) {
         if (!this.partialAction.icon) return;
@@ -100,7 +109,7 @@ class IconTool extends Tool {
         this.bp.doAction("Place Icon", () => {
             this.bp.addObject({
                 type: "icon",
-                bottomRight: this.partialAction.mousePosition,
+                topLeft: this.iconTopLeft(this.partialAction.mousePosition, this.partialAction.icon),
                 icon: this.partialAction.icon,
             });
         });
@@ -112,7 +121,7 @@ class IconTool extends Tool {
         // Render a preview
         this.render(ctx, {
             type: "icon",
-            bottomRight: this.partialAction.mousePosition,
+            topLeft: this.iconTopLeft(this.partialAction.mousePosition, this.partialAction.icon),
             icon: this.partialAction.icon,
             preview: true
         });
@@ -126,7 +135,7 @@ class IconTool extends Tool {
         const img = $(`.icon[data-value="${icon.id}"] img`)[0];
         const scaleX = bp.ROTATION.scaleX[icon.rotation];
         const rotation = bp.ROTATION.rotate[icon.rotation] / 180 * Math.PI;
-        const [x, y] = [object.bottomRight.x - width/2, object.bottomRight.y - height/2];
+        const [x, y] = [object.topLeft.x + width/2, object.topLeft.y + height/2];
 
         ctx.translate(x, y);
         ctx.scale(scaleX, 1);
@@ -159,6 +168,14 @@ class IconTool extends Tool {
         );
 
         ctx.restore()
+    }
+    intersect(object, mouse) {
+        const icon = bp.ICONS[object.icon];
+        const [width, height] = icon.size || [32, 32];
+        return (object.topLeft.x <= mouse.x &&
+                mouse.x <= object.topLeft.x + width &&
+                object.topLeft.y <= mouse.y &&
+                mouse.y <= object.topLeft.y + height);
     }
 }
 class PanTool extends Tool {
@@ -193,6 +210,7 @@ class PanTool extends Tool {
 }
 class SelectTool extends Tool { 
     /* Select, edit, or move */
+    // TODO: Multi-select by dragging a rectangle
     emptyAction = { mouseDown: false, selection: null };
     allowSnap = false; // Complicated!
 
@@ -202,9 +220,9 @@ class SelectTool extends Tool {
         if (this.partialAction.selection && this.partialAction.mouseDown) {
             const [dx, dy] = [canvasPoint.x - this.partialAction.startDrag.x, canvasPoint.y - this.partialAction.startDrag.y];
             // Update preview
-            this.partialAction.selection.bottomRight = {
-                x: dx + this.partialAction.originalBottomRight.x,
-                y: dy + this.partialAction.originalBottomRight.y
+            this.partialAction.selection.topLeft = {
+                x: dx + this.partialAction.originalTopLeft.x,
+                y: dy + this.partialAction.originalTopLeft.y
             };
         }
     }
@@ -216,20 +234,23 @@ class SelectTool extends Tool {
         this.partialAction.mousePosition = this.partialAction.startDrag = canvasPoint;
         if (this.partialAction.selection) {
             this.allowSnap = true; // Moving snaps
-            this.partialAction.originalBottomRight = this.partialAction.selection.bottomRight;
+            this.partialAction.originalTopLeft = this.partialAction.selection.topLeft;
         }
+    }
+    select(thing) {
+        this.partialAction.selection = thing;
     }
     onMouseUp(canvasPoint) {
         if (this.partialAction.selection) { // Move
             // Undo the move preview, so we can record the original position in the action
             this.onMouseMove(canvasPoint);
-            const finalPos = this.partialAction.selection.bottomRight;
-            this.partialAction.selection.bottomRight = this.partialAction.originalBottomRight;
-            delete this.partialAction.originalBottomRight;
+            const finalPos = this.partialAction.selection.topLeft;
+            this.partialAction.selection.topLeft = this.partialAction.originalTopLeft;
+            delete this.partialAction.originalTopLeft;
 
             // Record the full move as an action
             bp.doAction("Move Object", () => {
-                this.partialAction.selection.bottomRight = finalPos;
+                this.partialAction.selection.topLeft = finalPos;
             });
         }
 
@@ -250,26 +271,20 @@ class SelectTool extends Tool {
         this.partialAction.selection = null;
     }
     findThing(mouse) {
+        if (!mouse) return;
         // Find the object under the mouse, if any
         for (var obj of bp.objects) {
             if (this.intersect(obj, mouse)) return obj;
         }
     }
     intersect(object, mouse) {
-        if (object.type == "icon") {
-            const icon = bp.ICONS[object.icon];
-            const [width, height] = icon.size || [32, 32];
-            return (object.bottomRight.x - width <= mouse.x &&
-                    mouse.x <= object.bottomRight.x &&
-                    object.bottomRight.y - height <= mouse.y &&
-                    mouse.y <= object.bottomRight.y);
-        }
-
+        if (object.type == "icon") return bp.TOOLS.icon.intersect(object, mouse);
+        if (object.type == "text") return bp.TOOLS.text.intersect(object, mouse);
     }
     renderPreviewBefore(ctx) { 
         const hover = this.findThing(this.partialAction.mousePosition);
         const selected = this.partialAction.selection;
-        const dragging = this.partialAction.dragging;
+        const dragging = this.partialAction.mouseDown;
 
         // While something is selected, show it specially.
         if (selected) selected.selected = true;
@@ -279,7 +294,7 @@ class SelectTool extends Tool {
     }
     renderPreview(ctx) { 
         const hover = this.findThing(this.partialAction.mousePosition);
-        const dragging = this.partialAction.dragging;
+        const dragging = this.partialAction.mouseDown;
         const selected = this.partialAction.selection;
         if (hover) delete hover.highlight;
 
@@ -287,22 +302,90 @@ class SelectTool extends Tool {
         // (While mouse is down AND something is selected, show it being dragged)
         if (selected) delete selected.selected;
 
-        // TODO: While mouse is up AND mouse is over something already selected, show a special icon
+        // Mouse icon
+        var mouse = "";
+        if (dragging && selected)        mouse = "grabbing"
+        else if (dragging && !selected)  mouse = ""; // "crosshair"
+        else if (!dragging && hover && hover == selected)
+            if (selected.type == "text") mouse = "text";
+            else                         mouse = "grab";
+        else if (!dragging && hover)     mouse = "grab";
+        else if (!dragging)              mouse = ""; // "crosshair"
+        else                             mouse = "";
+        $("canvas").css("cursor", mouse);
 
-        
         // TODO: While mouse is down AND nothing is selected, show a rectangle selection preview of multi-select
-
     } 
 }
 class PolygonTool extends Tool {
 
 }
-class TextTool extends Tool { }
+
+class TextTool extends Tool { 
+    // TODO: Show something on mouse hover before click
+    onMouseDown(canvasPoint) {
+        bp.doAction("Add Text", () => {
+            const text = this.bp.addObject({
+                type: "text",
+                topLeft: canvasPoint,
+                text: "",
+            });
+            bp.selectTool({
+                tool: "select",
+                selection: text
+            });
+        });
+    }
+    intersect(object, mouse) {
+        if (!object.size) return false;
+        const {width, height} = object.size
+        return (object.topLeft.x <= mouse.x &&
+                mouse.x <= object.topLeft.x + width &&
+                object.topLeft.y <= mouse.y &&
+                mouse.y <= object.topLeft.y + height);
+    }
+    render(ctx, object) {
+        if (object.type != "text") return;
+        ctx.save();
+
+        const {x, y} = object.topLeft
+        const text = object.text || "Insert Future Text Here";
+        if (object.font) ctx.font = object.font;
+        const tm = ctx.measureText(text);
+        const [width, height] = [tm.width, tm.actualBoundingBoxAscent + tm.actualBoundingBoxDescent];
+
+        object.size = {width, height}; // TODO: Find a better place to stash this so it's not persisted
+        ctx.fillText(text, object.topLeft.x, object.topLeft.y);
+        
+        // Draw border if it's being edited.
+        if (object.selected || object.highlight) {
+            if (object.selected) {
+                ctx.strokeStyle = "#55f";
+                ctx.lineWidth = 2;
+            } else if (object.highlight) {
+                ctx.fillStyle = "rgba(200, 200, 255, 0.5)";
+                ctx.strokeStyle = "grey";
+                ctx.lineWidth = 5;
+            }
+            ctx.beginPath();
+            const b = 5;
+            ctx.moveTo(x,         y);
+            ctx.lineTo(x + width, y);
+            ctx.lineTo(x + width, y + height);
+            ctx.lineTo(x,         y + height);
+            ctx.closePath();
+            if (object.highlight) ctx.fill();
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+}
 
 class Blueprint {
     constructor() {
         this.persisted = ["polygons", "objects", "title", "autosave"];
-        // NOT persisted: viewport position and zoom, tool state, undo/redo history
+        // NOT persisted: viewport position and zoom, settings, tool selection, tool state, undo/redo history
         this.origin = {x: 0, y: 0};
 
         // A "MultiPolygon": Array of polygons
@@ -435,21 +518,24 @@ class Blueprint {
         // Draw less dots when you zoom out, to improve performance
         while (Math.max(size.width, size.height) / dotSpacing > 100) dotSpacing *= 2;
 
+        ctx.save();
+        ctx.fillStyle = "#000";
+        ctx.strokeWidth = 1;
         const originScaled = {x: origin.x / this.scale, y: origin.y / this.scale};
         for (var i = Math.floor(originScaled.x/dotSpacing); i <= (originScaled.x + size.width) / dotSpacing; i++) {
             for (var j = Math.floor(originScaled.y/dotSpacing); j <= (originScaled.y + size.height) / dotSpacing; j++) {
-                ctx.fillStyle = "#000";
-                ctx.strokeWidth = 1;
                 ctx.beginPath();
                 const radius = Math.max(0.5, 0.5/this.scale);
                 ctx.arc(dotSpacing * i, dotSpacing * j, radius, 0, 2 * Math.PI);
                 ctx.fill();
             }
         }
+        ctx.restore();
 
         if (this.currentTool) this.currentTool.renderPreviewBefore(ctx);
 
         // Draw polygons
+        ctx.save()
         ctx.fillStyle = "brown";
         ctx.strokeStyle = "black";
         ctx.strokeWidth = 5;
@@ -465,13 +551,17 @@ class Blueprint {
         }
         ctx.fill()
         ctx.stroke()
+        ctx.restore()
 
         // Draw icons
         for (var object of this.objects) {
             if (object.type == "icon") this.TOOLS.icon.render(ctx, object);
         }
 
-        // TODO: Draw text
+        // Draw text
+        for (var object of this.objects) {
+            if (object.type == "text") this.TOOLS.text.render(ctx, object);
+        }
 
         // Draw current tool preview
         if (this.currentTool) this.currentTool.renderPreview(ctx);
@@ -527,6 +617,7 @@ class Blueprint {
         $(".tool.selected").removeClass("selected");
         $(`.tool[data-tool=${tool}]`).addClass("selected");
         $(".icons").css("display", tool === "icon" ? "flex" : "");
+        $("canvas").css("cursor", ""); // Clear any style on the cursor
 
         if (!this.TOOLS[options.tool]) {
             console.log(`tool ${tool} not implemented`);
@@ -537,6 +628,10 @@ class Blueprint {
             if (this.currentTool) this.currentTool.forgetState();
             this.currentTool = this.TOOLS[options.tool];
             this.currentTool.forgetState(); // SHOULD not be needed but just in case.
+        }
+
+        if (this.currentTool == this.TOOLS["select"] && options.selection) {
+            this.currentTool.select(options.selection);
         }
     }
     toggle(options) {
@@ -562,6 +657,7 @@ class Blueprint {
         if (sharedState) {
             this.saveKey = "shared"; // Avoid overwriting your save with the shared link
             this.state = JSON.parse(decodeURIComponent(sharedState));
+            this.autosave = false;
         }
         this.redraw();
     }

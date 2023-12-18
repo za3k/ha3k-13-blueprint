@@ -110,7 +110,7 @@ div.draw-area canvas {
     left: 0;
     right: 0;
     padding: 4px;
-    height: 3rem;
+    height: fit-content;
     background: white;
     border-top: 2px dashed lightgrey;
     display: flex;
@@ -148,8 +148,11 @@ div.draw-area canvas {
     border: 1px solid red;
 }
 
+.toolbar > *:not(:last-child) {
+    border-right: 2px dashed lightgrey;
+}
+
 .settings {
-    border-left: 2px dashed lightgrey;
     padding-left: 1rem;
     margin-left: 1rem;
 }
@@ -183,7 +186,7 @@ div.draw-area canvas {
     color: black;
 }
 .toggle-option.selected {
-    background: lightgrey;
+    background: rgba(200, 255, 200, 0.6);
     color: black;
 }
 
