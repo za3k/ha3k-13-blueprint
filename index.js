@@ -15,11 +15,11 @@ class Tool {
     onDelete()               {}
     renderPreview(ctx)       {} // Render a preview for mouse hover, partial draw, etc.
     renderPreviewBefore(ctx) {}
-    intersect(object, size, mouse) {
-        return (object.topLeft.x <= mouse.x &&
-                mouse.x <= object.topLeft.x + size.width &&
-                object.topLeft.y <= mouse.y &&
-                mouse.y <= object.topLeft.y + size.height)
+    intersect(topLeft, size, mouse) {
+        return (topLeft.x <= mouse.x &&
+                mouse.x <= topLeft.x + size.width &&
+                topLeft.y <= mouse.y &&
+                mouse.y <= topLeft.y + size.height)
     }
 }
 
@@ -172,7 +172,7 @@ class IconTool extends Tool {
     }
     intersect(object, mouse) {
         const size = bp.ICONS[object.icon].size
-        return super.intersect(object, size, mouse)
+        return super.intersect(object.topLeft, size, mouse)
     }
 }
 
@@ -333,8 +333,9 @@ class TextTool extends Tool {
         })
     }
     intersect(object, mouse) {
-        if (!object.size) return false
-        return super.intersect(object, object.size, mouse)
+        if (!object._size) return false
+        if (!object._actualTopLeft) return false
+        return super.intersect(object._actualTopLeft, object._size, mouse)
     }
     renderHighlight(ctx, selected, highlight, pos, size) {
         // Draw border if it's being edited.
@@ -348,7 +349,7 @@ class TextTool extends Tool {
             ctx.strokeStyle = "grey"
             ctx.lineWidth = 5
         }
-        const b = 0 //5
+        const b = 5
         ctx.moveTo(pos.x - b,              pos.y - b)
         ctx.lineTo(pos.x + b + size.width, pos.y - b)
         ctx.lineTo(pos.x + b + size.width, pos.y + b + size.height)
@@ -375,17 +376,22 @@ class TextTool extends Tool {
         const text = object.text || "Insert Future Text Here"
         if (object.font) ctx.font = object.font
         const tm = ctx.measureText(text)
+        const pos = {
+            x: object.topLeft.x,
+            y: object.topLeft.y - tm.actualBoundingBoxAscent
+        }
         const size = {
             width: tm.width,
             height: tm.actualBoundingBoxAscent + tm.actualBoundingBoxDescent
         }
 
         // TODO: Find a better place to stash this so it's not persisted
-        object.size = size
+        object._actualTopLeft = pos
+        object._size = size
         ctx.fillText(text, object.topLeft.x, object.topLeft.y)
 
         this.renderHighlight(ctx, object.selected, object.highlight,
-            object.topLeft, size)
+            pos, size)
     }
     renderPreview(ctx) {
         if (!this.partialAction.mousePosition) return
@@ -506,6 +512,7 @@ class Blueprint {
     }
     addObject(object) {
         this.objects.push(object)
+        return object
     } 
     deleteObject(object) {
         const index = this.objects.findIndex(e => e===object)
