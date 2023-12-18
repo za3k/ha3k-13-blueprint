@@ -26,12 +26,6 @@ class Tool {
     }
 }
 
-// Single-click, multiple clicks, drag motion
-
-class TextEditor {
-    
-}
-
 class RectangleTool extends Tool {
     emptyAction = { draw: false }
     onMouseDown(canvasPoint) {
@@ -218,7 +212,6 @@ class PanTool extends Tool {
 
 class SelectTool extends Tool { 
     /* Select, edit, or move */
-    // TODO: Multi-select by dragging a rectangle
     // TODO: Clicking in place is causing slight shift -- snap-related
     emptyAction = { mouseDown: false, selection: null }
     allowSnap = false // Complicated!
@@ -257,6 +250,12 @@ class SelectTool extends Tool {
         this.selectObject(null)
         super.deselect()
     }
+    selectFont(font) {
+        this.partialAction.selection.font = font // Text editing magic woo
+    }
+    textEdited(text) {
+        this.partialAction.selection.text = text // Text editing magic woo
+    }
     onMouseUp(canvasPoint) {
         const selection = this.partialAction.selection
         if (selection) { // Move
@@ -281,7 +280,6 @@ class SelectTool extends Tool {
         // Selection does not change
 
         // Open editor
-        // TODO: Only if it didn't move?
         if (selection && !selection.edited && bp.TOOLS[selection.type].edit)
             bp.TOOLS[selection.type].edit(selection)
     }
@@ -309,8 +307,6 @@ class SelectTool extends Tool {
         if (selected) selected.selected = true
         // While mouse is up AND mouse is over something not selected, draw it highlighted in a border
         if (!dragging && hover && !hover.selected) hover.highlight = true
-
-        // TODO: Live preview text editing and font changes
     }
     renderPreview(ctx) { 
         const hover = this.findThing(this.partialAction.mousePosition)
@@ -364,8 +360,8 @@ class TextTool extends Tool {
     edit(object) {
         console.log("Start editing text")
         object.edited = true
+        this.orig = deepcopy(object)
 
-        // Place a textarea at the position of the edited textbox, then select it.
         $(".text-bar").addClass("active")
         $(".text-editor").show()
 
@@ -375,21 +371,27 @@ class TextTool extends Tool {
         ta.value = object.text
         ta.focus()
         ta.setSelectionRange(object.text.length, object.text.length)
+
+        if (object.font) bp.selectFont({value: object.font});
     }
     stopEdit(object) {
         console.log("Stop editing text")
         delete object.edited
         const ta = $(".text-editor textarea")[0]
-        const newText = ta.value;
+        const newText = ta.value
+        const newFont = object.font
         $(".text-bar").removeClass("active")
         $(".text-editor").hide()
 
         // Persist changes
-        if (newText != object.text) {
+        if (newText != this.orig.text || newFont != this.orig.font) {
+            object.text = this.orig.text
+            object.font = this.orig.font
+            delete this.orig
             bp.doAction("Edit Text", () => {
                 if (!newText); // TODO: Delete empty text objects
                 object.text = newText
-                if (this.font) object.font = this.font
+                if (newFont) object.font = newFont
             })
         }
     }
@@ -493,6 +495,19 @@ class Blueprint {
             scaleX: [1,1,1,1,-1,-1,-1,-1],
             rotate: [0, 90, 180, 270, 0, 90, 180, 270],
         }
+        this.FONTS = [
+            "14pt PermanentMarker",
+            "18pt PermanentMarker",
+            "24pt PermanentMarker",
+            "36pt PermanentMarker",
+            "10pt serif",
+            "12pt serif",
+            "14pt serif",
+            "18pt serif",
+            "24pt serif",
+            "36pt serif",
+        ]
+        this.TOOLS.text.font = this.FONTS[0] // default font
         const ROT2 = [0,1]
         const ROT4 = [0,1,2,3]
         const ROT8 = [0,4,1,5,2,6,3,7]
@@ -524,6 +539,11 @@ class Blueprint {
         }
         for (var icon of Object.values(this.ICONS)) icon.size ||= { width: 32, height: 32 }
 
+        for (var font of this.FONTS) {
+            const fontSelector = $(`<div class="font action" data-function="selectFont" data-value="${font}">Aa</div>`)
+            fontSelector.css("font", font)
+            $(".fonts > div").append(fontSelector)
+        }
         for (var [id, icon] of Object.entries(this.ICONS)) {
             const iconSelector = $(`<div class="icon action" data-function="selectIcon" data-value="${icon.id}"><img src="${icon.image}" alt="${icon.text}" width=${icon.size.width} height=${icon.size.height}/><span class="icon-name">${icon.name}</span></div>`)
             if (icon.rotation) {
@@ -696,6 +716,14 @@ class Blueprint {
         this.selectedIcon = icon
         this.currentTool.selectIcon(icon)
     }
+    selectFont(options) {
+        const font = options.value
+        $(".font.selected").removeClass("selected")
+        $(`.font[data-value="${font}"]`).addClass("selected")
+        this.currentTool.selectFont(font)
+        $(".text-editor textarea").css("font", font);
+        bp.redraw()
+    }
     selectTool(options) {
         const tool = options.tool
         //console.log(`Tool ${tool} selected`)
@@ -713,6 +741,7 @@ class Blueprint {
             if (this.currentTool) this.currentTool.deselect()
             this.currentTool = this.TOOLS[options.tool]
             this.currentTool.select()
+            if (this.currentTool.font) this.selectFont({value: this.currentTool.font})
         }
 
         if (this.currentTool == this.TOOLS["select"] && options.selection) {
@@ -807,7 +836,6 @@ class Blueprint {
                 bp.currentTool.onMouseDown(bp.canvasPos(ev, bp.currentTool.allowSnap))
                 bp.redraw()
             }
-            // TODO: Right click to pan
         }).on("mouseup", (ev) => {
             if(!bp.currentTool) return
             if (event.button == 0) {
@@ -843,6 +871,10 @@ class Blueprint {
                     bp.currentTool.selectObject(null)
                     break
             }
+        })
+        $(".text-editor textarea").on("input", (ev) => {
+            if (bp.currentTool.textEdited) bp.currentTool.textEdited(ev.target.value)
+            bp.redraw()
         })
     }
 }

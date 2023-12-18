@@ -107,8 +107,24 @@ div.draw-area canvas {
     filter: invert(1);
 }
 
-.fonts {
+.fonts > div {
     width: 5rem;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+.font {
+    text-align: center;
+    padding: 5px;
+    background: white;
+    color: black;
+}
+.font:hover:not(.selected) {
+    background: lightgrey;
+}
+.font.selected {
+    background: black;
+    color: white;
 }
 
 .footer {
