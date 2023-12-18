@@ -3,32 +3,30 @@ function deepcopy(x) { return JSON.parse(JSON.stringify(x)) }
 class Tool {
     emptyAction = { }
     allowSnap = true
+
     constructor(bp, ...args) {
         this.partialAction = deepcopy(this.emptyAction) // A tool may have started being used, and is incomplete
         this.bp = bp
     }
-    forgetState() { this.partialAction = deepcopy(this.emptyAction) }
+    forgetState()            { this.partialAction = deepcopy(this.emptyAction) }
     onMouseMove(canvasPoint) { this.partialAction.mousePosition = canvasPoint }
     onMouseDown(canvasPoint) { this.partialAction.mousePosition = canvasPoint }
-    onMouseUp(canvasPoint) { this.partialAction.mousePosition = canvasPoint }
-    onDelete() {}
-    renderPreview(ctx) { } // Render a preview for mouse hover, partial draw, etc.
-    renderPreviewBefore(ctx) { }
+    onMouseUp(canvasPoint)   { this.partialAction.mousePosition = canvasPoint }
+    onDelete()               {}
+    renderPreview(ctx)       {} // Render a preview for mouse hover, partial draw, etc.
+    renderPreviewBefore(ctx) {}
+    intersect(object, size, mouse) {
+        return (object.topLeft.x <= mouse.x &&
+                mouse.x <= object.topLeft.x + size.width &&
+                object.topLeft.y <= mouse.y &&
+                mouse.y <= object.topLeft.y + size.height)
+    }
 }
 
 // Single-click, multiple clicks, drag motion
 
 class RectangleTool extends Tool {
     emptyAction = { draw: false }
-    constructor(...args) {
-        super(...args)
-    }
-    forgetState() {
-        this.partialAction = { draw: false }
-    }
-    onMouseMove(canvasPoint) {
-        this.partialAction.mousePosition = canvasPoint
-    }
     onMouseDown(canvasPoint) {
         this.partialAction.draw = true
         this.partialAction.start = this.partialAction.mousePosition = canvasPoint
@@ -88,8 +86,8 @@ class RectangleTool extends Tool {
         }
     }
 }
+
 class IconTool extends Tool {
-    emptyAction = { icon: null }
     selectIcon(icon) {
         this.partialAction.icon = icon
     }
@@ -101,9 +99,9 @@ class IconTool extends Tool {
         }
     }
     onMouseDown(canvasPoint) {
+        super.onMouseDown(...arguments)
         if (!this.partialAction.icon) return
 
-        this.partialAction.mousePosition = canvasPoint
         this.bp.doAction("Place Icon", () => {
             this.bp.addObject({
                 type: "icon",
@@ -165,13 +163,11 @@ class IconTool extends Tool {
         )
     }
     intersect(object, mouse) {
-        const icon = bp.ICONS[object.icon]
-        return (object.topLeft.x <= mouse.x &&
-                mouse.x <= object.topLeft.x + icon.size.width &&
-                object.topLeft.y <= mouse.y &&
-                mouse.y <= object.topLeft.y + icon.size.height)
+        const size = bp.ICONS[object.icon].size;
+        return super.intersect(object, size, mouse);
     }
 }
+
 class PanTool extends Tool {
     emptyAction = { dragging: false }
     allowSnap = false
@@ -202,6 +198,7 @@ class PanTool extends Tool {
         super.onMouseUp(canvasPoint)
     }
 }
+
 class SelectTool extends Tool { 
     /* Select, edit, or move */
     // TODO: Multi-select by dragging a rectangle
@@ -269,12 +266,8 @@ class SelectTool extends Tool {
         if (!mouse) return
         // Find the object under the mouse, if any
         for (var obj of bp.objects) {
-            if (this.intersect(obj, mouse)) return obj
+            if (bp.TOOLS[obj.type].intersect(obj, mouse)) return obj
         }
-    }
-    intersect(object, mouse) {
-        if (object.type == "icon") return bp.TOOLS.icon.intersect(object, mouse)
-        if (object.type == "text") return bp.TOOLS.text.intersect(object, mouse)
     }
     renderPreviewBefore() { 
         const hover = this.findThing(this.partialAction.mousePosition)
@@ -312,6 +305,7 @@ class SelectTool extends Tool {
         // TODO: While mouse is down AND nothing is selected, show a rectangle selection preview of multi-select
     } 
 }
+
 class PolygonTool extends Tool {
 
 }
@@ -332,11 +326,7 @@ class TextTool extends Tool {
     }
     intersect(object, mouse) {
         if (!object.size) return false
-        const {width, height} = object.size
-        return (object.topLeft.x <= mouse.x &&
-                mouse.x <= object.topLeft.x + width &&
-                object.topLeft.y <= mouse.y &&
-                mouse.y <= object.topLeft.y + height)
+        return super.intersect(object, object.size, mouse)
     }
     render(ctx, object) {
         if (object.type != "text") return
@@ -520,10 +510,8 @@ class Blueprint {
 
         // Draw grid dots. Complicated because there are infinity of them.
         // Draw less dots when you zoom out, to improve performance
-        var dotSpacing = this.gridSize
-        while (Math.max(size.width, size.height) / dotSpacing > 100) dotSpacing *= 2
-
         ctx.save()
+        for (var dotSpacing = this.gridSize; Math.max(size.width, size.height) / dotSpacing > 100; dotSpacing *= 2);
         ctx.fillStyle = "#000"
         ctx.strokeWidth = 1
         const originScaled = {x: origin.x / this.scale, y: origin.y / this.scale}
