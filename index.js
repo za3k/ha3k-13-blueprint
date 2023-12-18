@@ -209,7 +209,6 @@ class PanTool extends Tool {
 
 class SelectTool extends Tool { 
     /* Select, edit, or move */
-    // TODO: Clicking in place is causing slight shift -- snap-related
     emptyAction = { mouseDown: false, selection: null }
     allowSnap = false // Complicated!
 
@@ -266,7 +265,7 @@ class SelectTool extends Tool {
 
         if (selection && !selection.edited) { // Move
             // Record the full move as an action
-            const hasMoved = (
+            const hasMoved = this.partialAction.originalTopLeft && (
                 this.partialAction.selection.topLeft.x != this.partialAction.originalTopLeft.x || 
                 this.partialAction.selection.topLeft.y != this.partialAction.originalTopLeft.y
             )
@@ -675,12 +674,12 @@ class Blueprint {
         ctx.restore()
     }
     didAction(name) {
-        console.log(name, this.state.objects)
+        //console.log(name, this.state.objects)
         this.history.push({
             name: name,
             state: deepcopy(this.state) // state after the action
         })
-        console.log(this.history.length, this.history)
+        //console.log(this.history.length, this.history)
         this.redoHistory = []
         this.redraw()
         if (this.autosave) this.save()
@@ -690,7 +689,7 @@ class Blueprint {
         const action = this.history.pop()
         this.redoHistory.push(action)
         this.showAlert("Undo", action.name)
-        console.log("Undo", this.history.length, this.history)
+        //console.log("Undo", this.history.length, this.history)
         this.state = deepcopy(this.history[this.history.length-1].state)
         this.redraw()
         if (this.autosave) this.save()
@@ -700,7 +699,7 @@ class Blueprint {
         const action = this.redoHistory.pop()
         this.history.push(action)
         this.showAlert("Redo", action.name)
-        console.log("Redo", this.history.length, this.history)
+        //console.log("Redo", this.history.length, this.history)
         this.state = deepcopy(this.history[this.history.length-1].state)
         this.redraw()
         if (this.autosave) this.save()
