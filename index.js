@@ -246,6 +246,10 @@ class SelectTool extends Tool {
             bp.TOOLS[old.type].stopEdit(old)
         return old
     }
+    editObject(object) {
+        if (object.edited) return
+        if (bp.TOOLS[object.type].edit) bp.TOOLS[object.type].edit(object)
+    }
     deselect() {
         this.selectObject(null)
         super.deselect()
@@ -280,8 +284,7 @@ class SelectTool extends Tool {
         // Selection does not change
 
         // Open editor
-        if (selection && !selection.edited && bp.TOOLS[selection.type].edit)
-            bp.TOOLS[selection.type].edit(selection)
+        if (selection) this.editObject(selection)
     }
     onDelete() {
         if (!this.partialAction.selection) return
@@ -372,8 +375,12 @@ class TextTool extends Tool {
         //taj.css("font", object.font || "")
         const ta = taj[0]
         ta.value = object.text
-        ta.focus()
-        ta.setSelectionRange(object.text.length, object.text.length)
+        function focus() {
+            ta.focus()
+            ta.setSelectionRange(object.text.length, object.text.length)
+        }
+        focus()
+        setTimeout(focus, 0)
 
         if (object.font) bp.selectFont({value: object.font});
     }
@@ -387,15 +394,17 @@ class TextTool extends Tool {
         $(".text-editor").hide()
 
         // Persist changes
-        if (newText != this.orig.text || newFont != this.orig.font) {
+        if (newText != this.orig.text || (!!newText & !!this.orig.text && newFont != this.orig.font)) {
             object.text = this.orig.text
             object.font = this.orig.font
             delete this.orig
             bp.doAction("Edit Text", () => {
-                if (!newText); // TODO: Delete empty text objects
+                if (!newText) bp.deleteObject(object);
                 object.text = newText
                 if (newFont) object.font = newFont
             })
+        } else if (!newText) {
+            bp.deleteObject(object);
         }
     }
     renderHighlight(ctx, selected, highlight, pos, size) {
@@ -675,11 +684,13 @@ class Blueprint {
         ctx.restore()
     }
     doAction(name, a) {
+        // TODO: Undo/redo should really use a didAction() interface (and restore to right after two actions ago)
+        // Current strategy is to persist right before a(), but this fails because of all kinds of crazy transient stuff we do like live-editing for previews, or not adding empty text nodes in an action
         this.history.push({
             name: name,
             state: deepcopy(this.state)
         })
-        console.log(this.state.objects)
+        console.log(name, this.state.objects)
         a()
         this.redoHistory = []
         this.redraw()
@@ -726,6 +737,8 @@ class Blueprint {
         $(`.font[data-value="${font}"]`).addClass("selected")
         this.currentTool.selectFont(font)
         //$(".text-editor textarea").css("font", font);
+        const textEditing = $(".text-editor").css("display") != "none"
+        if (textEditing) $(".text-editor textarea")[0].focus()
         bp.redraw()
     }
     selectTool(options) {
@@ -750,6 +763,7 @@ class Blueprint {
 
         if (this.currentTool == this.TOOLS["select"] && options.selection) {
             this.currentTool.selectObject(options.selection)
+            this.currentTool.editObject(options.selection)
         }
     }
     toggle(options) {
