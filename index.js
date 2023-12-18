@@ -95,6 +95,8 @@ class RectangleTool extends Tool {
 }
 
 class IconTool extends Tool {
+    persisted = ["topLeft", "icon"]
+
     selectIcon(icon) {
         this.partialAction.icon = icon
     }
@@ -339,6 +341,8 @@ class PolygonTool extends Tool {
 }
 
 class TextTool extends Tool { 
+    persisted = ["topLeft", "text", "font"]
+
     onMouseDown(canvasPoint) {
         bp.doAction("Add Text", () => {
             const text = this.bp.addObject({
@@ -425,7 +429,7 @@ class TextTool extends Tool {
         if (object.type != "text") return
 
         const {x, y} = object.topLeft
-        const text = object.text || "Insert Future Text Here"
+        const text = object.text
         if (object.font) ctx.font = object.font
         const tm = ctx.measureText(text)
         const pos = {
@@ -456,7 +460,6 @@ class Blueprint {
         this.persisted = ["polygons", "objects", "title", "autosave"]
         // NOT persisted: viewport position and zoom, settings, tool selection, tool state, undo/redo history
 
-        // TODO: Don't persist object.edited, highlighted, selected, _size, _actualTopLeft (on undo, redo, save, share)
         this.origin = {x: 0, y: 0}
 
         // A "MultiPolygon": Array of polygons
@@ -539,8 +542,14 @@ class Blueprint {
     }
     get state() {
         var s = {}
-        for (var index of this.persisted) {
-            s[index] = this[index]
+        for (var index of this.persisted) s[index] = this[index]
+        // Only the persistent parts of 'this.objects'
+        s.objects = []
+        for (var [index, orig] of Object.entries(this.objects)) {
+            var o = { type: orig.type }
+            var sp = this.TOOLS[orig.type].persisted
+            for (var si of sp) o[si] = orig[si]
+            s.objects[index] = o
         }
         return s
     }
@@ -814,7 +823,7 @@ class Blueprint {
     }
     bindKeys() {
         $(document).on("keydown", (ev) => {
-            const textEditing = $(".text-editor").css("display") == "block"
+            const textEditing = $(".text-editor").css("display") != "none"
             switch (ev.key) {
                 case ev.ctrlKey && 'z':
                     ev.preventDefault()
@@ -858,7 +867,7 @@ $(document).ready((ev) => {
 
     //  Initialize tool icons in toolbar
     $(".tool").data("function", "selectTool").addClass("action")
-    $(".tools > *").each((i, t) => {
+    $(".tools > .section > *").each((i, t) => {
         t = $(t)
         const toolName = t.data("name")
         const tooltip = $(`<span class="tooltip">${toolName}</span>`)

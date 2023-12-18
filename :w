@@ -154,11 +154,12 @@ div.draw-area canvas {
     padding-right: 0;
 }
 .tools > div.section {
+    border-left: 2px dashed lightgrey;
     display: flex;
-    padding: 0 0.5rem 0 0.5rem;
+    padding: 0 1rem 0 1rem;
 }
 .tools > div.section:not(:first-child) {
-    border-left: 2px dotted lightgrey;
+
 }
 .tools div:hover > .tooltip {
     display: block;
