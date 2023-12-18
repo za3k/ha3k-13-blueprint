@@ -3,6 +3,27 @@
   user-select: none;
 }
 
+.alert {
+    position: fixed;
+    display: none;
+    right: 10px;
+    top: 10px;
+    text-align: center;
+    background: white;
+    border: 1px solid;
+    color: grey;
+    width: 10rem;
+}
+.alert .action {
+    font-size: 18pt;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+}
+.alert .detail {
+    margin: 1rem;
+    font-size: 14pt;
+}
+
 body:not(.local)::before {
     position: fixed;
     left: 0;

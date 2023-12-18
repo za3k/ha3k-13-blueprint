@@ -699,6 +699,7 @@ class Blueprint {
     undo() {
         if (this.history.length == 0) return
         const action = this.history.pop()
+        this.showAlert("Undo", action.name)
         this.redoHistory.push({
             name: action.name,
             state: this.state
@@ -710,6 +711,7 @@ class Blueprint {
     redo() {
         if (this.redoHistory.length == 0) return
         const action = this.redoHistory.pop()
+        this.showAlert("Redo", action.name)
         this.history.push({
             name: action.name,
             state: this.state
@@ -842,6 +844,14 @@ class Blueprint {
         this.origin.x -= dx * oldScale
         this.origin.y -= dy * oldScale
         this.redraw()
+    }
+    showAlert(title, details) {
+        $(".alert .action").text(title);
+        $(".alert .detail").text(details);
+        $(".alert").show();
+        setTimeout(() => {
+            $(".alert").fadeOut()
+        }, 2000);
     }
     bindMouse() {
         $(document).on("mousemove", (ev) => {
