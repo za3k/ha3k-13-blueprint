@@ -39,13 +39,11 @@ class RectangleTool extends Tool {
         const [t, b] = [Math.min(start.y, stop.y), Math.max(start.y, stop.y)]
         const rect = [[l, t], [r, t], [r, b], [l, b], [l, t]]
         if (this.bp.drawErase) {
-            this.bp.doAction("Draw Rectangle", () => {
-                this.bp.erasePoly([rect])
-            })
+            this.bp.erasePoly([rect])
+            this.bp.didAction("Erase Rectangle")
         } else {
-            this.bp.doAction("Erase Rectangle", () => {
-                this.bp.addPoly([rect])
-            })
+            this.bp.addPoly([rect])
+            this.bp.didAction("Draw Rectangle")
         }
         this.forgetState()
         this.partialAction.mousePosition = canvasPoint
@@ -105,13 +103,12 @@ class IconTool extends Tool {
         super.onMouseDown(...arguments)
         if (!this.partialAction.icon) return
 
-        this.bp.doAction("Place Icon", () => {
-            this.bp.addObject({
-                type: "icon",
-                topLeft: this.iconTopLeft(this.partialAction.mousePosition, this.partialAction.icon),
-                icon: this.partialAction.icon,
-            })
+        this.bp.addObject({
+            type: "icon",
+            topLeft: this.iconTopLeft(this.partialAction.mousePosition, this.partialAction.icon),
+            icon: this.partialAction.icon,
         })
+        this.bp.didAction("Place Icon")
     }
     renderPreview(ctx) {
         if (!this.partialAction.mousePosition) return
@@ -222,10 +219,12 @@ class SelectTool extends Tool {
         if (this.partialAction.selection && this.partialAction.mouseDown) {
             const [dx, dy] = [canvasPoint.x - this.partialAction.startDrag.x, canvasPoint.y - this.partialAction.startDrag.y]
             // Update preview
-            this.partialAction.selection.topLeft = {
+            var pos = {
                 x: dx + this.partialAction.originalTopLeft.x,
                 y: dy + this.partialAction.originalTopLeft.y
             }
+            if (bp.gridSnap) pos = bp.snap(pos)
+            this.partialAction.selection.topLeft = pos
         }
     }
     onMouseDown(canvasPoint) {
@@ -235,7 +234,6 @@ class SelectTool extends Tool {
 
         this.partialAction.mousePosition = this.partialAction.startDrag = canvasPoint
         if (this.partialAction.selection) {
-            this.allowSnap = true // Moving snaps
             this.partialAction.originalTopLeft = this.partialAction.selection.topLeft
         }
     }
@@ -261,24 +259,22 @@ class SelectTool extends Tool {
         this.partialAction.selection.text = text // Text editing magic woo
     }
     onMouseUp(canvasPoint) {
-        const selection = this.partialAction.selection
-        if (selection && !selection.edited) { // Move
-            // Undo the move preview, so we can record the original position in the action
-            this.onMouseMove(canvasPoint)
-            const finalPos = this.partialAction.selection.topLeft
-            this.partialAction.selection.topLeft = this.partialAction.originalTopLeft
-            delete this.partialAction.originalTopLeft
+        super.onMouseUp(canvasPoint)
+        this.partialAction.mouseDown = false
 
+        const selection = this.partialAction.selection
+
+        if (selection && !selection.edited) { // Move
             // Record the full move as an action
-            bp.doAction("Move Object", () => {
-                this.partialAction.selection.topLeft = finalPos
-            })
+            const hasMoved = (
+                this.partialAction.selection.topLeft.x != this.partialAction.originalTopLeft.x || 
+                this.partialAction.selection.topLeft.y != this.partialAction.originalTopLeft.y
+            )
+            delete this.partialAction.originalTopLeft
+            if (hasMoved) bp.didAction("Move Object")
         }
 
         // Reset drag
-        this.partialAction.mousePosition = canvasPoint
-        this.partialAction.mouseDown = false
-        this.allowSnap = false
         delete this.partialAction.startDrag
 
         // Selection does not change
@@ -290,9 +286,8 @@ class SelectTool extends Tool {
         if (!this.partialAction.selection) return
         // Delete the selected thing
         const old = this.selectObject(null); // Un-edit the thing
-        bp.doAction("Delete Object", () => {
-            bp.deleteObject(old)
-        })
+        bp.deleteObject(old)
+        bp.didAction("Delete Object")
     }
     findThing(mouse) {
         if (!mouse) return
@@ -344,17 +339,15 @@ class TextTool extends Tool {
 
     onMouseDown(canvasPoint) {
         // Deliberately not persisted, because it's still empty.
-        bp.doAction("Add Text", () => {
-            const text = this.bp.addObject({
-                type: "text",
-                topLeft: canvasPoint,
-                text: "",
-                font: this.font,
-            })
-            bp.selectTool({
-                tool: "select",
-                selection: text
-            })
+        const text = this.bp.addObject({
+            type: "text",
+            topLeft: canvasPoint,
+            text: "",
+            font: this.font,
+        })
+        bp.selectTool({
+            tool: "select",
+            selection: text
         })
     }
     selectFont(font) { this.font = font }
@@ -364,7 +357,6 @@ class TextTool extends Tool {
         return super.intersect(object._actualTopLeft, object._size, mouse, 5)
     }
     edit(object) {
-        console.log("Start editing text")
         object.edited = true
         this.orig = deepcopy(object)
 
@@ -385,7 +377,6 @@ class TextTool extends Tool {
         if (object.font) bp.selectFont({value: object.font});
     }
     stopEdit(object) {
-        console.log("Stop editing text")
         delete object.edited
         const ta = $(".text-editor textarea")[0]
         const newText = ta.value
@@ -394,18 +385,18 @@ class TextTool extends Tool {
         $(".text-editor").hide()
 
         // Persist changes
-        if (newText != this.orig.text || (!!newText & !!this.orig.text && newFont != this.orig.font)) {
-            object.text = this.orig.text
-            object.font = this.orig.font
-            delete this.orig
-            bp.doAction("Edit Text", () => {
-                if (!newText) bp.deleteObject(object);
-                object.text = newText
-                if (newFont) object.font = newFont
-            })
+        if (!newText && !this.orig.text) {
+            bp.deleteObject(object);
         } else if (!newText) {
             bp.deleteObject(object);
+            bp.didAction("Delete Text");
+        } else {
+            const changed = newText != this.orig.text || newFont != this.orig.font;
+            object.text = newText
+            if (newFont) object.font = newFont
+            if (changed) bp.didAction("Edit Text");
         }
+        delete this.orig
     }
     renderHighlight(ctx, selected, highlight, pos, size) {
         // Draw border if it's being edited.
@@ -683,40 +674,34 @@ class Blueprint {
         if (this.currentTool) this.currentTool.renderPreview(ctx)
         ctx.restore()
     }
-    doAction(name, a) {
-        // TODO: Undo/redo should really use a didAction() interface (and restore to right after two actions ago)
-        // Current strategy is to persist right before a(), but this fails because of all kinds of crazy transient stuff we do like live-editing for previews, or not adding empty text nodes in an action
+    didAction(name) {
+        console.log(name, this.state.objects)
         this.history.push({
             name: name,
-            state: deepcopy(this.state)
+            state: deepcopy(this.state) // state after the action
         })
-        console.log(name, this.state.objects)
-        a()
+        console.log(this.history.length, this.history)
         this.redoHistory = []
         this.redraw()
         if (this.autosave) this.save()
     }
     undo() {
-        if (this.history.length == 0) return
+        if (this.history.length <= 1) return
         const action = this.history.pop()
+        this.redoHistory.push(action)
         this.showAlert("Undo", action.name)
-        this.redoHistory.push({
-            name: action.name,
-            state: this.state
-        })
-        this.state = action.state
+        console.log("Undo", this.history.length, this.history)
+        this.state = deepcopy(this.history[this.history.length-1].state)
         this.redraw()
         if (this.autosave) this.save()
     }
     redo() {
-        if (this.redoHistory.length == 0) return
+        if (this.redoHistory.length <= 0) return
         const action = this.redoHistory.pop()
+        this.history.push(action)
         this.showAlert("Redo", action.name)
-        this.history.push({
-            name: action.name,
-            state: this.state
-        })
-        this.state = action.state
+        console.log("Redo", this.history.length, this.history)
+        this.state = deepcopy(this.history[this.history.length-1].state)
         this.redraw()
         if (this.autosave) this.save()
     }
@@ -806,6 +791,10 @@ class Blueprint {
         this.redoHistory = []
         this.save()
         this.redraw()
+        this.loaded()
+    }
+    loaded() {
+        this.didAction("Loaded")
     }
     help() {
         $(".help-bar").toggle()
@@ -946,4 +935,5 @@ $(document).ready((ev) => {
     $("img").attr("draggable", "false")
 
     if (window.location.origin == "file://") $("body").addClass("local")
+    bp.loaded()
 })
