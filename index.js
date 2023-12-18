@@ -53,41 +53,39 @@ class RectangleTool extends Tool {
     }
     renderPreview(ctx) { // Render a preview for mouse hover, partial draw, etc.
         if (!this.partialAction.mousePosition) return;
-        ctx.save();
         if (this.partialAction.draw) {
             // Show a preview of the huge draw rectangle
-            const start = this.partialAction.start;
-            const stop=this.partialAction.mousePosition;
+            const start=this.partialAction.start
+            const stop=this.partialAction.mousePosition
 
-            ctx.fillStyle = "rgba(0, 255, 0, 0.5)";
-            ctx.strokeStyle = "#0f0";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(start.x, start.y);
-            ctx.lineTo(start.x,  stop.y);
-            ctx.lineTo( stop.x,  stop.y);
-            ctx.lineTo( stop.x, start.y);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+            ctx.fillStyle = "rgba(0, 255, 0, 0.5)"
+            ctx.strokeStyle = "#0f0"
+            ctx.lineWidth = 3
+            ctx.beginPath()
+            ctx.moveTo(start.x, start.y)
+            ctx.lineTo(start.x,  stop.y)
+            ctx.lineTo( stop.x,  stop.y)
+            ctx.lineTo( stop.x, start.y)
+            ctx.closePath()
+            ctx.fill()
+            ctx.stroke()
         } else {
             // Show a little preview rectangle
             const side = bp.snapSize;
             const tl = this.partialAction.mousePosition;
 
-            ctx.fillStyle = "rgba(0, 0, 255, 0.5)";
-            ctx.strokeStyle = "#66f";
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(tl.x, tl.y);
-            ctx.lineTo(tl.x + side, tl.y);
-            ctx.lineTo(tl.x + side, tl.y + side);
-            ctx.lineTo(tl.x, tl.y+side);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+            ctx.fillStyle = "rgba(0, 0, 255, 0.5)"
+            ctx.strokeStyle = "#66f"
+            ctx.lineWidth = 1.5
+            ctx.beginPath()
+            ctx.moveTo(tl.x, tl.y)
+            ctx.lineTo(tl.x + side, tl.y)
+            ctx.lineTo(tl.x + side, tl.y + side)
+            ctx.lineTo(tl.x, tl.y+side)
+            ctx.closePath()
+            ctx.fill()
+            ctx.stroke()
         }
-        ctx.restore();
     }
 }
 class IconTool extends Tool {
@@ -96,10 +94,10 @@ class IconTool extends Tool {
         this.partialAction.icon = icon;
     }
     iconTopLeft(bottomRight, icon) {
-        const [width, height] = bp.ICONS[this.partialAction.icon].size || [32, 32];
+        const size = bp.ICONS[this.partialAction.icon].size;
         return {
-            x: bottomRight.x - width,
-            y: bottomRight.y - height,
+            x: bottomRight.x - size.width,
+            y: bottomRight.y - size.height,
         };
     }
     onMouseDown(canvasPoint) {
@@ -128,10 +126,9 @@ class IconTool extends Tool {
     }
     render(ctx, object) {
         if (!object.type == "icon") return;
-        ctx.save()
 
         const icon = bp.ICONS[object.icon];
-        const [width, height] = icon.size || [32, 32];
+        const {width, height} = icon.size;
         const img = $(`.icon[data-value="${icon.id}"] img`)[0];
         const scaleX = bp.ROTATION.scaleX[icon.rotation];
         const rotation = bp.ROTATION.rotate[icon.rotation] / 180 * Math.PI;
@@ -166,16 +163,13 @@ class IconTool extends Tool {
             -width/2, -height/2,
             width, height
         );
-
-        ctx.restore()
     }
     intersect(object, mouse) {
         const icon = bp.ICONS[object.icon];
-        const [width, height] = icon.size || [32, 32];
         return (object.topLeft.x <= mouse.x &&
-                mouse.x <= object.topLeft.x + width &&
+                mouse.x <= object.topLeft.x + icon.size.width &&
                 object.topLeft.y <= mouse.y &&
-                mouse.y <= object.topLeft.y + height);
+                mouse.y <= object.topLeft.y + icon.size.height);
     }
 }
 class PanTool extends Tool {
@@ -211,6 +205,7 @@ class PanTool extends Tool {
 class SelectTool extends Tool { 
     /* Select, edit, or move */
     // TODO: Multi-select by dragging a rectangle
+    // TODO: Clicking in place is causing slight shift--probably snap-related.
     emptyAction = { mouseDown: false, selection: null };
     allowSnap = false; // Complicated!
 
@@ -281,7 +276,7 @@ class SelectTool extends Tool {
         if (object.type == "icon") return bp.TOOLS.icon.intersect(object, mouse);
         if (object.type == "text") return bp.TOOLS.text.intersect(object, mouse);
     }
-    renderPreviewBefore(ctx) { 
+    renderPreviewBefore() { 
         const hover = this.findThing(this.partialAction.mousePosition);
         const selected = this.partialAction.selection;
         const dragging = this.partialAction.mouseDown;
@@ -322,7 +317,6 @@ class PolygonTool extends Tool {
 }
 
 class TextTool extends Tool { 
-    // TODO: Show something on mouse hover before click
     onMouseDown(canvasPoint) {
         bp.doAction("Add Text", () => {
             const text = this.bp.addObject({
@@ -346,39 +340,50 @@ class TextTool extends Tool {
     }
     render(ctx, object) {
         if (object.type != "text") return;
-        ctx.save();
 
         const {x, y} = object.topLeft
         const text = object.text || "Insert Future Text Here";
-        if (object.font) ctx.font = object.font;
-        const tm = ctx.measureText(text);
+        if (object.font) ctx.font = object.font
+        const tm = ctx.measureText(text)
         const [width, height] = [tm.width, tm.actualBoundingBoxAscent + tm.actualBoundingBoxDescent];
 
-        object.size = {width, height}; // TODO: Find a better place to stash this so it's not persisted
-        ctx.fillText(text, object.topLeft.x, object.topLeft.y);
+        object.size = {width, height} // TODO: Find a better place to stash this so it's not persisted
+        ctx.fillText(text, object.topLeft.x, object.topLeft.y)
         
         // Draw border if it's being edited.
         if (object.selected || object.highlight) {
+            ctx.beginPath()
             if (object.selected) {
-                ctx.strokeStyle = "#55f";
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#55f"
+                ctx.lineWidth = 2
             } else if (object.highlight) {
-                ctx.fillStyle = "rgba(200, 200, 255, 0.5)";
-                ctx.strokeStyle = "grey";
-                ctx.lineWidth = 5;
+                ctx.fillStyle = "rgba(200, 200, 255, 0.5)"
+                ctx.strokeStyle = "grey"
+                ctx.lineWidth = 5
             }
-            ctx.beginPath();
-            const b = 5;
-            ctx.moveTo(x,         y);
-            ctx.lineTo(x + width, y);
-            ctx.lineTo(x + width, y + height);
-            ctx.lineTo(x,         y + height);
-            ctx.closePath();
-            if (object.highlight) ctx.fill();
-            ctx.stroke();
+            const b = 0 //5
+            ctx.moveTo(x - b,         y - b)
+            ctx.lineTo(x + b + width, y - b)
+            ctx.lineTo(x + b + width, y + b + height)
+            ctx.lineTo(x - b,         y + b + height)
+            ctx.closePath()
+            if (object.highlight) ctx.fill()
+            ctx.stroke()
         }
+    }
+    renderPreview(ctx) {
+        // Show a little cursor
+        if (!this.partialAction.mousePosition) return;
+        const center = this.partialAction.mousePosition;
+        const radius = 2;
 
-        ctx.restore();
+        ctx.beginPath()
+        ctx.fillStyle = "rgba(0, 0, 255, 0.5)"
+        ctx.strokeStyle = "#66f"
+        ctx.lineWidth = 1.5
+        ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI)
+        ctx.fill()
+        ctx.stroke()
     }
 }
 
@@ -448,10 +453,10 @@ class Blueprint {
                 this.ICONS[icon.id] = icon;
             }
         }
+        for (var icon of Object.values(this.ICONS)) icon.size ||= { width: 32, height: 32 };
 
         for (var [id, icon] of Object.entries(this.ICONS)) {
-            const [width, height] = icon.size || [32, 32];
-            const iconSelector = $(`<div class="icon action" data-function="selectIcon" data-value="${icon.id}"><img src="${icon.image}" alt="${icon.text}" width=${width} height=${height}/><span class="icon-name">${icon.name}</span></div>`);
+            const iconSelector = $(`<div class="icon action" data-function="selectIcon" data-value="${icon.id}"><img src="${icon.image}" alt="${icon.text}" width=${icon.size.width} height=${icon.size.height}/><span class="icon-name">${icon.name}</span></div>`);
             if (icon.rotation) {
                 var transforms = [];
                 const [scaleX, rotation] = [this.ROTATION.scaleX[icon.rotation], this.ROTATION.rotate[icon.rotation]];
@@ -514,57 +519,63 @@ class Blueprint {
                        height: canvas.height / this.scale }
 
         // Draw grid dots. Complicated because there are infinity of them.
-        var dotSpacing = this.gridSize;
         // Draw less dots when you zoom out, to improve performance
+        var dotSpacing = this.gridSize;
         while (Math.max(size.width, size.height) / dotSpacing > 100) dotSpacing *= 2;
 
-        ctx.save();
-        ctx.fillStyle = "#000";
-        ctx.strokeWidth = 1;
+        ctx.save()
+        ctx.fillStyle = "#000"
+        ctx.strokeWidth = 1
         const originScaled = {x: origin.x / this.scale, y: origin.y / this.scale};
         for (var i = Math.floor(originScaled.x/dotSpacing); i <= (originScaled.x + size.width) / dotSpacing; i++) {
             for (var j = Math.floor(originScaled.y/dotSpacing); j <= (originScaled.y + size.height) / dotSpacing; j++) {
-                ctx.beginPath();
-                const radius = Math.max(0.5, 0.5/this.scale);
-                ctx.arc(dotSpacing * i, dotSpacing * j, radius, 0, 2 * Math.PI);
-                ctx.fill();
+                ctx.beginPath()
+                const radius = Math.max(0.5, 0.5/this.scale)
+                ctx.arc(dotSpacing * i, dotSpacing * j, radius, 0, 2 * Math.PI)
+                ctx.fill()
             }
         }
-        ctx.restore();
+        ctx.restore()
 
+        // Do highlights, selection
+        ctx.save()
         if (this.currentTool) this.currentTool.renderPreviewBefore(ctx);
+        ctx.restore()
 
         // Draw polygons
         ctx.save()
-        ctx.fillStyle = "brown";
-        ctx.strokeStyle = "black";
-        ctx.strokeWidth = 5;
-        ctx.beginPath();
+        ctx.fillStyle = "brown"
+        ctx.strokeStyle = "black"
+        ctx.strokeWidth = 5
         for (var poly of this.polygons) {
+            ctx.beginPath()
             for (var ring of poly) {
-                ctx.moveTo(ring[0][0], ring[0][1]);
+                ctx.moveTo(ring[0][0], ring[0][1])
                 for (var point of ring.slice(1)) {
-                    ctx.lineTo(point[0], point[1]);
+                    ctx.lineTo(point[0], point[1])
                 }
-                ctx.closePath();
             }
+            ctx.closePath()
+            ctx.stroke()
+            ctx.fill()
         }
-        ctx.fill()
-        ctx.stroke()
         ctx.restore()
 
-        // Draw icons
-        for (var object of this.objects) {
-            if (object.type == "icon") this.TOOLS.icon.render(ctx, object);
-        }
-
-        // Draw text
-        for (var object of this.objects) {
-            if (object.type == "text") this.TOOLS.text.render(ctx, object);
+        // Draw icons, text
+        for (var layer of ["icon", "text"]) {
+            for (var object of this.objects) {
+                if (object.type == layer) {
+                    ctx.save()
+                    this.TOOLS[layer].render(ctx, object)
+                    ctx.restore()
+                }
+            }
         }
 
         // Draw current tool preview
-        if (this.currentTool) this.currentTool.renderPreview(ctx);
+        ctx.save()
+        if (this.currentTool) this.currentTool.renderPreview(ctx)
+        ctx.restore()
     }
     doAction(name, a) {
         this.history.push({
@@ -613,7 +624,7 @@ class Blueprint {
     }
     selectTool(options) {
         const tool = options.tool
-        console.log(`Tool ${tool} selected`);
+        //console.log(`Tool ${tool} selected`);
         $(".tool.selected").removeClass("selected");
         $(`.tool[data-tool=${tool}]`).addClass("selected");
         $(".icons").css("display", tool === "icon" ? "flex" : "");
@@ -637,7 +648,7 @@ class Blueprint {
     toggle(options) {
         const {toggles, value} = options;
         this[options.toggles] = options.value;
-        console.log(`Toggled ${toggles} to ${value}`)
+        //console.log(`Toggled ${toggles} to ${value}`)
         $(`.toggle[data-toggles=${toggles}] .toggle-option[data-value=true]`).toggleClass("selected", value);
         $(`.toggle[data-toggles=${toggles}] .toggle-option[data-value=false]`).toggleClass("selected", !value);
     }
