@@ -9,9 +9,13 @@
 </head>
 <body>
 <div class="draw-area"><canvas></canvas></div>
-<div class="icons"><div></div></div>
-<div class="fonts"></div>
-<div class="toolbar">
+<div class="footer">
+<div class="icon-bar"><div class="icons"><div></div></div></div>
+<div class="text-bar">
+    <div class="text-editor"><textarea spellcheck="false" editable></textarea></div>
+    <div class="fonts"></div>
+</div>
+<div class="toolbar active">
     <div class="tools">
         <div class="tool" data-tool="pan" data-name="Pan"><img src="image/tool-pan.png" width=32 height=32></div>
         <div class="tool" data-tool="select" data-name="Edit/Move"><img src="image/tool-select.png" width=32 height=32></div>
@@ -23,14 +27,18 @@
         <div class="action" data-function="clear" data-name="Delete Blueprint"><img src="image/tool-clear.png" width=32 height=32></div>
         <div class="action incomplete" data-function="download" data-name="Save Blueprint as File"><img src="image/tool-download.png" width=32 height=32></div>
         <div class="action incomplete" data-function="upload" data-name="Load Blueprint from File"><img src="image/tool-upload.png" width=32 height=32></div>
+        <div class="action" data-function="help" data-name="About"><img src="image/tool-help.png" width=32 height=32></div>
     </div>
     <div class="settings">
         <div class="toggle" data-toggles="drawErase" data-toggle-name="Mode" data-false-name="Draw" data-true-name="Erase"></div>
         <div class="toggle" data-toggles="gridSnap" data-toggle-name="Snap" data-true-name="On" data-false-name="Off"></div>
     </div>
 </div>
-<div class="footer">
-    <b>hack-a-blueprint</b> was made by za3k part of <a href="https://za3k.com/hackaday">hack-a-day</a>. Source code is available <a href="https://github.com/za3k/ha3k-13-blueprint">on github</a>. It is inspired by <a href="https://www.dungeonscrawl.com">dungeon scrawl</a>. Blueprints auto-save.
+<div class="help-bar">
+    <div class="help">
+        <b>hack-a-blueprint</b> was made by za3k part of <a href="https://za3k.com/hackaday">hack-a-day</a>. Source code is available <a href="https://github.com/za3k/ha3k-13-blueprint">on github</a>. It is inspired by <a href="https://www.dungeonscrawl.com">dungeon scrawl</a>.
+    </div>
+</div>
 </div>
 </body>
 </html>

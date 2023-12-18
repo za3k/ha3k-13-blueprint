@@ -15,15 +15,22 @@ class Tool {
     onDelete()               {}
     renderPreview(ctx)       {} // Render a preview for mouse hover, partial draw, etc.
     renderPreviewBefore(ctx) {}
-    intersect(topLeft, size, mouse) {
-        return (topLeft.x <= mouse.x &&
-                mouse.x <= topLeft.x + size.width &&
-                topLeft.y <= mouse.y &&
-                mouse.y <= topLeft.y + size.height)
+    select()                 { this.forgetState(); }
+    deselect()               { this.forgetState(); } // Just in case
+    intersect(topLeft, size, mouse, border) {
+        border ||= 0;
+        return (topLeft.x - border <= mouse.x &&
+                mouse.x <= topLeft.x + size.width + border &&
+                topLeft.y - border <= mouse.y &&
+                mouse.y <= topLeft.y + size.height + border)
     }
 }
 
 // Single-click, multiple clicks, drag motion
+
+class TextEditor {
+    
+}
 
 class RectangleTool extends Tool {
     emptyAction = { draw: false }
@@ -228,7 +235,7 @@ class SelectTool extends Tool {
     }
     onMouseDown(canvasPoint) {
         // Select a thing
-        this.partialAction.selection = this.findThing(canvasPoint)
+        this.selectObject(this.findThing(canvasPoint))
         this.partialAction.mouseDown = true
 
         this.partialAction.mousePosition = this.partialAction.startDrag = canvasPoint
@@ -237,11 +244,20 @@ class SelectTool extends Tool {
             this.partialAction.originalTopLeft = this.partialAction.selection.topLeft
         }
     }
-    select(thing) {
+    selectObject(thing) {
+        const old = this.partialAction.selection
         this.partialAction.selection = thing
+        if (old && thing !== old && bp.TOOLS[old.type].stopEdit)
+            bp.TOOLS[old.type].stopEdit(old)
+        return old
+    }
+    deselect() {
+        this.selectObject(null)
+        super.deselect()
     }
     onMouseUp(canvasPoint) {
-        if (this.partialAction.selection) { // Move
+        const selection = this.partialAction.selection
+        if (selection) { // Move
             // Undo the move preview, so we can record the original position in the action
             this.onMouseMove(canvasPoint)
             const finalPos = this.partialAction.selection.topLeft
@@ -261,14 +277,19 @@ class SelectTool extends Tool {
         delete this.partialAction.startDrag
 
         // Selection does not change
+
+        // Open editor
+        // TODO: Only if it didn't move?
+        if (selection && !selection.edited && bp.TOOLS[selection.type].edit)
+            bp.TOOLS[selection.type].edit(selection)
     }
     onDelete() {
         if (!this.partialAction.selection) return
         // Delete the selected thing
+        const old = this.selectObject(null); // Un-edit the thing
         bp.doAction("Delete Object", () => {
-            bp.deleteObject(this.partialAction.selection)
+            bp.deleteObject(old)
         })
-        this.partialAction.selection = null
     }
     findThing(mouse) {
         if (!mouse) return
@@ -287,6 +308,7 @@ class SelectTool extends Tool {
         // While mouse is up AND mouse is over something not selected, draw it highlighted in a border
         if (!dragging && hover && !hover.selected) hover.highlight = true
 
+        // TODO: Live preview text editing and font changes
     }
     renderPreview(ctx) { 
         const hover = this.findThing(this.partialAction.mousePosition)
@@ -309,8 +331,6 @@ class SelectTool extends Tool {
         else if (!dragging)              mouse = "" // "crosshair"
         else                             mouse = ""
         $("canvas").css("cursor", mouse)
-
-        // TODO: While mouse is down AND nothing is selected, show a rectangle selection preview of multi-select
     } 
 }
 
@@ -335,7 +355,39 @@ class TextTool extends Tool {
     intersect(object, mouse) {
         if (!object._size) return false
         if (!object._actualTopLeft) return false
-        return super.intersect(object._actualTopLeft, object._size, mouse)
+        return super.intersect(object._actualTopLeft, object._size, mouse, 5)
+    }
+    edit(object) {
+        console.log("Start editing text")
+        object.edited = true
+
+        // Place a textarea at the position of the edited textbox, then select it.
+        $(".text-bar").addClass("active")
+        $(".text-editor").show()
+
+        const taj = $(".text-editor textarea")
+        taj.css("font", object.font || "")
+        const ta = taj[0]
+        ta.value = object.text
+        ta.focus()
+        ta.setSelectionRange(object.text.length, object.text.length)
+    }
+    stopEdit(object) {
+        console.log("Stop editing text")
+        delete object.edited
+        const ta = $(".text-editor textarea")[0]
+        const newText = ta.value;
+        $(".text-bar").removeClass("active")
+        $(".text-editor").hide()
+
+        // Persist changes
+        if (newText != object.text) {
+            bp.doAction("Edit Text", () => {
+                if (!newText); // TODO: Delete empty text objects
+                object.text = newText
+                if (this.font) object.font = this.font
+            })
+        }
     }
     renderHighlight(ctx, selected, highlight, pos, size) {
         // Draw border if it's being edited.
@@ -385,10 +437,10 @@ class TextTool extends Tool {
             height: tm.actualBoundingBoxAscent + tm.actualBoundingBoxDescent
         }
 
-        // TODO: Find a better place to stash this so it's not persisted
         object._actualTopLeft = pos
         object._size = size
-        ctx.fillText(text, object.topLeft.x, object.topLeft.y)
+        //if (!object.edited)
+            ctx.fillText(text, object.topLeft.x, object.topLeft.y)
 
         this.renderHighlight(ctx, object.selected, object.highlight,
             pos, size)
@@ -403,6 +455,8 @@ class Blueprint {
     constructor() {
         this.persisted = ["polygons", "objects", "title", "autosave"]
         // NOT persisted: viewport position and zoom, settings, tool selection, tool state, undo/redo history
+
+        // TODO: Don't persist object.edited, highlighted, selected, _size, _actualTopLeft (on undo, redo, save, share)
         this.origin = {x: 0, y: 0}
 
         // A "MultiPolygon": Array of polygons
@@ -638,7 +692,7 @@ class Blueprint {
         //console.log(`Tool ${tool} selected`)
         $(".tool.selected").removeClass("selected")
         $(`.tool[data-tool=${tool}]`).addClass("selected")
-        $(".icons").css("display", tool === "icon" ? "flex" : "")
+        $(".icon-bar").toggleClass("active", tool=="icon");
         $("canvas").css("cursor", "") // Clear any style on the cursor
 
         if (!this.TOOLS[options.tool]) {
@@ -647,13 +701,13 @@ class Blueprint {
         }
 
         if (this.currentTool !== this.TOOLS[options.tool]) {
-            if (this.currentTool) this.currentTool.forgetState()
+            if (this.currentTool) this.currentTool.deselect()
             this.currentTool = this.TOOLS[options.tool]
-            this.currentTool.forgetState() // SHOULD not be needed but just in case.
+            this.currentTool.select()
         }
 
         if (this.currentTool == this.TOOLS["select"] && options.selection) {
-            this.currentTool.select(options.selection)
+            this.currentTool.selectObject(options.selection)
         }
     }
     toggle(options) {
@@ -695,7 +749,9 @@ class Blueprint {
         this.save()
         this.redraw()
     }
-    
+    help() {
+        $(".help-bar").toggle()
+    }
     canvasPos(ev, allowSnap) {
         // Convert mouse coordinates
         const rect = bp.canvas.getBoundingClientRect()
@@ -758,6 +814,7 @@ class Blueprint {
     }
     bindKeys() {
         $(document).on("keydown", (ev) => {
+            const textEditing = $(".text-editor").css("display") == "block"
             switch (ev.key) {
                 case ev.ctrlKey && 'z':
                     ev.preventDefault()
@@ -767,10 +824,14 @@ class Blueprint {
                     ev.preventDefault()
                     this.redo()
                     break
-                case 'Delete':
-                case 'Backspace':
+                case !textEditing && 'Delete':
+                case !textEditing && 'Backspace':
                     ev.preventDefault()
                     if (bp.currentTool) bp.currentTool.onDelete()
+                    break
+                case textEditing && !ev.shiftKey && 'Enter':
+                    ev.preventDefault()
+                    bp.currentTool.selectObject(null)
                     break
             }
         })

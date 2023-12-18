@@ -37,21 +37,25 @@ div.draw-area canvas {
     align-items:center;
 }
 
-.tools, .settings, .toggle {
+.footer > * > * {
     padding-left: 1rem;
     padding-right: 1rem;
     height: 100%;
+    display: flex;
+    align-items: center;
 }
 
-.icons, .fonts {
-    position: fixed;
+.footer > * {
     display: none;
-    bottom: 6rem;
     right: 0;
-    padding: 1rem;
     background: white;
-    border: 2px dashed lightgrey;
     border-bottom: 0;
+}
+.footer > .toolbar {
+    left: 0;
+}
+.footer > *.active {
+    display: flex;
 }
 
 .icons {
@@ -65,6 +69,7 @@ div.draw-area canvas {
     padding: 0.2rem;
 }
 .icons::before,
+.text-editor::before,
 .fonts::before,
 .tools::before,
 .settings::before {
@@ -78,7 +83,10 @@ div.draw-area canvas {
     content: "icons";
 }
 .fonts::before {
-    content: "fonts";
+    content: "font";
+}
+.text-editor::before {
+    content: "text";
 }
 .settings::before {
     content: "settings";
@@ -101,19 +109,25 @@ div.draw-area canvas {
 
 .fonts {
     width: 5rem;
-    height: 5rem;
 }
 
-.toolbar {
+.footer {
     position: fixed;
-    bottom: 3rem;
+    bottom: 0;
     left: 0;
     right: 0;
-    padding: 4px;
-    height: fit-content;
     background: white;
-    border-top: 2px dashed lightgrey;
     display: flex;
+    flex-direction: column;
+}
+
+.footer > * {
+    padding: 4px;
+    height: min-content;
+    background: white;
+}
+.footer > * {
+    border-top: 2px dashed lightgrey;
 }
 
 .tool {
@@ -148,7 +162,7 @@ div.draw-area canvas {
     border: 1px solid red;
 }
 
-.toolbar > *:not(:last-child) {
+.footer > * > *:not(:last-child) {
     border-right: 2px dashed lightgrey;
 }
 
@@ -190,15 +204,27 @@ div.draw-area canvas {
     color: black;
 }
 
-.footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+.help {
     padding: 4px;
-    height: 3rem;
+    display: block;
+}
+
+.text-bar {
+    padding: 4px;
+    height: fit-content;
     background: white;
     border-top: 2px dashed lightgrey;
+    display: none;
+}
+.text-bar.active {
+    display: flex;
+}
+
+.text-editor textarea {
+    overflow: hidden;
+    white-space: nowrap;
+    resize: none;
+    height: 2em;
 }
 
 .text {
