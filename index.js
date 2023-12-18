@@ -258,7 +258,7 @@ class SelectTool extends Tool {
     }
     onMouseUp(canvasPoint) {
         const selection = this.partialAction.selection
-        if (selection) { // Move
+        if (selection && !selection.edited) { // Move
             // Undo the move preview, so we can record the original position in the action
             this.onMouseMove(canvasPoint)
             const finalPos = this.partialAction.selection.topLeft
@@ -340,11 +340,13 @@ class TextTool extends Tool {
     persisted = ["topLeft", "text", "font"]
 
     onMouseDown(canvasPoint) {
+        // Deliberately not persisted, because it's still empty.
         bp.doAction("Add Text", () => {
             const text = this.bp.addObject({
                 type: "text",
                 topLeft: canvasPoint,
                 text: "",
+                font: this.font,
             })
             bp.selectTool({
                 tool: "select",
@@ -352,6 +354,7 @@ class TextTool extends Tool {
             })
         })
     }
+    selectFont(font) { this.font = font }
     intersect(object, mouse) {
         if (!object._size) return false
         if (!object._actualTopLeft) return false
@@ -366,7 +369,7 @@ class TextTool extends Tool {
         $(".text-editor").show()
 
         const taj = $(".text-editor textarea")
-        taj.css("font", object.font || "")
+        //taj.css("font", object.font || "")
         const ta = taj[0]
         ta.value = object.text
         ta.focus()
@@ -676,6 +679,7 @@ class Blueprint {
             name: name,
             state: deepcopy(this.state)
         })
+        console.log(this.state.objects)
         a()
         this.redoHistory = []
         this.redraw()
@@ -721,7 +725,7 @@ class Blueprint {
         $(".font.selected").removeClass("selected")
         $(`.font[data-value="${font}"]`).addClass("selected")
         this.currentTool.selectFont(font)
-        $(".text-editor textarea").css("font", font);
+        //$(".text-editor textarea").css("font", font);
         bp.redraw()
     }
     selectTool(options) {
