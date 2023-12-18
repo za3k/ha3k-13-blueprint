@@ -49,41 +49,41 @@ class RectangleTool extends Tool {
         this.forgetState()
         this.partialAction.mousePosition = canvasPoint
     }
+    renderPreviewRectangle(ctx, start, stop) {
+        // Show a preview of the huge draw rectangle
+        ctx.fillStyle = "rgba(0, 255, 0, 0.5)"
+        ctx.strokeStyle = "#0f0"
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.moveTo(start.x, start.y)
+        ctx.lineTo(start.x,  stop.y)
+        ctx.lineTo( stop.x,  stop.y)
+        ctx.lineTo( stop.x, start.y)
+        ctx.closePath()
+        ctx.fill()
+        ctx.stroke()
+    }
+    renderPreviewDot(ctx, tl) {
+        // Show a little preview rectangle as a mouse cursor
+        const side = bp.snapSize
+        ctx.fillStyle = "rgba(0, 0, 255, 0.5)"
+        ctx.strokeStyle = "#66f"
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.moveTo(tl.x, tl.y)
+        ctx.lineTo(tl.x + side, tl.y)
+        ctx.lineTo(tl.x + side, tl.y + side)
+        ctx.lineTo(tl.x, tl.y+side)
+        ctx.closePath()
+        ctx.fill()
+        ctx.stroke()
+    }
     renderPreview(ctx) {
         if (!this.partialAction.mousePosition) return
-        if (this.partialAction.draw) {
-            // Show a preview of the huge draw rectangle
-            const start=this.partialAction.start
-            const stop=this.partialAction.mousePosition
-
-            ctx.fillStyle = "rgba(0, 255, 0, 0.5)"
-            ctx.strokeStyle = "#0f0"
-            ctx.lineWidth = 3
-            ctx.beginPath()
-            ctx.moveTo(start.x, start.y)
-            ctx.lineTo(start.x,  stop.y)
-            ctx.lineTo( stop.x,  stop.y)
-            ctx.lineTo( stop.x, start.y)
-            ctx.closePath()
-            ctx.fill()
-            ctx.stroke()
-        } else {
-            // Show a little preview rectangle as a mouse cursor
-            const side = bp.snapSize
-            const tl = this.partialAction.mousePosition
-
-            ctx.fillStyle = "rgba(0, 0, 255, 0.5)"
-            ctx.strokeStyle = "#66f"
-            ctx.lineWidth = 1.5
-            ctx.beginPath()
-            ctx.moveTo(tl.x, tl.y)
-            ctx.lineTo(tl.x + side, tl.y)
-            ctx.lineTo(tl.x + side, tl.y + side)
-            ctx.lineTo(tl.x, tl.y+side)
-            ctx.closePath()
-            ctx.fill()
-            ctx.stroke()
-        }
+        if (this.partialAction.draw) this.renderPreviewRectangle(ctx,
+            this.partialAction.start,
+            this.partialAction.mousePosition)
+        else this.renderPreviewDot(ctx, this.partialAction.mousePosition)
     }
 }
 
@@ -91,11 +91,11 @@ class IconTool extends Tool {
     selectIcon(icon) {
         this.partialAction.icon = icon
     }
-    iconTopLeft(bottomRight, icon) {
+    iconTopLeft(mouse, icon) {
         const size = bp.ICONS[this.partialAction.icon].size
         return {
-            x: bottomRight.x - size.width,
-            y: bottomRight.y - size.height,
+            x: mouse.x - size.width,
+            y: mouse.y - size.height,
         }
     }
     onMouseDown(canvasPoint) {
@@ -122,6 +122,26 @@ class IconTool extends Tool {
             preview: true
         })
     }
+    renderHighlight(ctx, selected, highlight, size) {
+        if (!selected && !highlight)  return
+        if (selected) {
+            ctx.strokeStyle = "#55f"
+            ctx.lineWidth = 2
+        } else if (highlight) {
+            ctx.fillStyle = "rgba(200, 200, 255, 0.5)"
+            ctx.strokeStyle = "grey"
+            ctx.lineWidth = 5
+        }
+        ctx.beginPath()
+        const b = 5
+        ctx.moveTo(-size.width/2-b, -size.height/2-b)
+        ctx.lineTo( size.width/2+b, -size.height/2-b)
+        ctx.lineTo( size.width/2+b,  size.height/2+b)
+        ctx.lineTo(-size.width/2-b,  size.height/2+b)
+        ctx.closePath()
+        if (highlight) ctx.fill()
+        ctx.stroke()
+    }
     render(ctx, object) {
         if (!object.type == "icon") return
 
@@ -130,32 +150,20 @@ class IconTool extends Tool {
         const img = $(`.icon[data-value="${icon.id}"] img`)[0]
         const scaleX = bp.ROTATION.scaleX[icon.rotation]
         const rotation = bp.ROTATION.rotate[icon.rotation] / 180 * Math.PI
-        const [x, y] = [object.topLeft.x + width/2, object.topLeft.y + height/2]
+        const center = {x: object.topLeft.x + width/2, y: object.topLeft.y + height/2}
 
-        ctx.translate(x, y)
+        ctx.translate(center.x, center.y)
         ctx.scale(scaleX, 1)
         ctx.rotate(rotation)
 
         if (object.preview) ctx.globalAlpha = 0.1
-        if (object.selected || object.highlight) {
-            if (object.selected) {
-                ctx.strokeStyle = "#55f"
-                ctx.lineWidth = 2
-            } else if (object.highlight) {
-                ctx.fillStyle = "rgba(200, 200, 255, 0.5)"
-                ctx.strokeStyle = "grey"
-                ctx.lineWidth = 5
-            }
-            ctx.beginPath()
-            const b = 5
-            ctx.moveTo(-width/2-b, -height/2-b)
-            ctx.lineTo( width/2+b, -height/2-b)
-            ctx.lineTo( width/2+b,  height/2+b)
-            ctx.lineTo(-width/2-b,  height/2+b)
-            ctx.closePath()
-            if (object.highlight) ctx.fill()
-            ctx.stroke()
-        }
+        this.renderHighlight(
+            ctx,
+            object.selected,
+            object.highlight,
+            icon.size,
+        )
+
         ctx.drawImage(
             img,
             -width/2, -height/2,
@@ -163,8 +171,8 @@ class IconTool extends Tool {
         )
     }
     intersect(object, mouse) {
-        const size = bp.ICONS[object.icon].size;
-        return super.intersect(object, size, mouse);
+        const size = bp.ICONS[object.icon].size
+        return super.intersect(object, size, mouse)
     }
 }
 
@@ -328,45 +336,30 @@ class TextTool extends Tool {
         if (!object.size) return false
         return super.intersect(object, object.size, mouse)
     }
-    render(ctx, object) {
-        if (object.type != "text") return
-
-        const {x, y} = object.topLeft
-        const text = object.text || "Insert Future Text Here"
-        if (object.font) ctx.font = object.font
-        const tm = ctx.measureText(text)
-        const [width, height] = [tm.width, tm.actualBoundingBoxAscent + tm.actualBoundingBoxDescent]
-
-        object.size = {width, height} // TODO: Find a better place to stash this so it's not persisted
-        ctx.fillText(text, object.topLeft.x, object.topLeft.y)
-        
+    renderHighlight(ctx, selected, highlight, pos, size) {
         // Draw border if it's being edited.
-        if (object.selected || object.highlight) {
-            ctx.beginPath()
-            if (object.selected) {
-                ctx.strokeStyle = "#55f"
-                ctx.lineWidth = 2
-            } else if (object.highlight) {
-                ctx.fillStyle = "rgba(200, 200, 255, 0.5)"
-                ctx.strokeStyle = "grey"
-                ctx.lineWidth = 5
-            }
-            const b = 0 //5
-            ctx.moveTo(x - b,         y - b)
-            ctx.lineTo(x + b + width, y - b)
-            ctx.lineTo(x + b + width, y + b + height)
-            ctx.lineTo(x - b,         y + b + height)
-            ctx.closePath()
-            if (object.highlight) ctx.fill()
-            ctx.stroke()
+        if (!selected && !highlight) return
+        ctx.beginPath()
+        if (selected) {
+            ctx.strokeStyle = "#55f"
+            ctx.lineWidth = 2
+        } else if (highlight) {
+            ctx.fillStyle = "rgba(200, 200, 255, 0.5)"
+            ctx.strokeStyle = "grey"
+            ctx.lineWidth = 5
         }
+        const b = 0 //5
+        ctx.moveTo(pos.x - b,              pos.y - b)
+        ctx.lineTo(pos.x + b + size.width, pos.y - b)
+        ctx.lineTo(pos.x + b + size.width, pos.y + b + size.height)
+        ctx.lineTo(pos.x - b,              pos.y + b + size.height)
+        ctx.closePath()
+        if (highlight) ctx.fill()
+        ctx.stroke()
     }
-    renderPreview(ctx) {
-        // Show a little cursor
-        if (!this.partialAction.mousePosition) return
-        const center = this.partialAction.mousePosition
+    renderCursor(ctx, center) {
+        // Show a little circle cursor
         const radius = 2
-
         ctx.beginPath()
         ctx.fillStyle = "rgba(0, 0, 255, 0.5)"
         ctx.strokeStyle = "#66f"
@@ -374,6 +367,29 @@ class TextTool extends Tool {
         ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI)
         ctx.fill()
         ctx.stroke()
+    }
+    render(ctx, object) {
+        if (object.type != "text") return
+
+        const {x, y} = object.topLeft
+        const text = object.text || "Insert Future Text Here"
+        if (object.font) ctx.font = object.font
+        const tm = ctx.measureText(text)
+        const size = {
+            width: tm.width,
+            height: tm.actualBoundingBoxAscent + tm.actualBoundingBoxDescent
+        }
+
+        // TODO: Find a better place to stash this so it's not persisted
+        object.size = size
+        ctx.fillText(text, object.topLeft.x, object.topLeft.y)
+
+        this.renderHighlight(ctx, object.selected, object.highlight,
+            object.topLeft, size)
+    }
+    renderPreview(ctx) {
+        if (!this.partialAction.mousePosition) return
+        this.renderCursor(ctx, this.partialAction.mousePosition)
     }
 }
 
