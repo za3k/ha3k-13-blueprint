@@ -51,7 +51,7 @@ class RectangleTool extends Tool {
     renderPreviewRectangle(ctx, start, stop) {
         // Show a preview of the huge draw rectangle
         ctx.fillStyle = "rgba(0, 255, 0, 0.5)"
-        ctx.strokeStyle = "#0f0"
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.5)"
         ctx.lineWidth = 3
         ctx.beginPath()
         ctx.moveTo(start.x, start.y)
@@ -330,6 +330,76 @@ class SelectTool extends Tool {
 }
 
 class PolygonTool extends Tool {
+    emptyAction = { points: [] }
+
+    now() { return Date.now() / 1000 }
+    renderPreviewPolygon(ctx, poly) {
+        // Preview the polygon
+        ctx.fillStyle = "rgba(0, 255, 0, 0.5)"
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.5)"
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        console.log(poly)
+        ctx.moveTo(poly[0][0], poly[0][1])
+        for (var pt of poly.slice(1))
+            ctx.lineTo(pt[0], pt[1])
+        ctx.closePath()
+        ctx.fill()
+        ctx.stroke()
+    }
+    renderCursor(ctx, center) {
+        // Show a little circle cursor
+        const radius = 2
+        ctx.beginPath()
+        ctx.fillStyle = "rgba(0, 0, 255, 0.5)"
+        ctx.strokeStyle = "#66f"
+        ctx.lineWidth = 1.5
+        ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI)
+        ctx.fill()
+        ctx.stroke()
+
+    }
+    onMouseDown(canvasPoint) {
+        super.onMouseDown(...arguments)
+        const now = this.now()
+        const elapsed = now - (this.partialAction.lastClick || 0)
+        const doubleClick = elapsed < 0.250
+
+        this.partialAction.lastClick = now
+        this.partialAction.points.push([canvasPoint.x, canvasPoint.y])
+        console.log(this.partialAction.points)
+
+        if (doubleClick) {
+            // Ignore one of the double-clicked points (should be the same)
+            this.partialAction.points.pop()
+
+            // Close the curve
+            var polygon = this.partialAction.points
+            polygon.push(polygon[0])
+            if (this.bp.drawErase) {
+                this.bp.erasePoly([polygon])
+                this.bp.didAction("Erase Polygon")
+            } else {
+                this.bp.addPoly([polygon])
+                this.bp.didAction("Draw Polygon")
+            }
+            this.forgetState()
+            this.partialAction.mousePosition = canvasPoint
+        }
+    }
+    renderPreview(ctx) {
+        const poly = [...this.partialAction.points]
+        const mouse = this.partialAction.mousePosition
+        if (!mouse) return
+
+        if (poly.length == 0) {
+            this.renderCursor(ctx, mouse)
+        } else {
+            poly.push([mouse.x, mouse.y])
+            this.renderPreviewPolygon(ctx, poly)
+        }
+    }
+
 
 }
 
@@ -488,7 +558,7 @@ class Blueprint {
             rectangle: new RectangleTool(this),
             pan: new PanTool(this),
             select: new SelectTool(this),
-            poly: new PolygonTool(this),
+            polygon: new PolygonTool(this),
             icon: new IconTool(this),
             text: new TextTool(this),
         }
