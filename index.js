@@ -846,6 +846,8 @@ class Blueprint {
             this.saveKey = "shared" // Avoid overwriting your save with the shared link
             this.state = JSON.parse(decodeURIComponent(sharedState))
             this.autosave = false
+            const newUrl = location.protocol + '//' + location.host + location.pathname
+            history.replaceState({},"",newUrl)
         }
         this.redraw()
     }
